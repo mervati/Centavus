@@ -1,0 +1,129 @@
+# Histórico de Contexto — Centavus
+> Arquivo gerado automaticamente pelo Claude Code para retomar o projeto em outra máquina.
+> Data: 2026-07-01
+
+---
+
+## O que foi construído
+
+**Centavus** — PWA de finanças pessoais, criado do zero nesta sessão.
+
+### Stack
+- React 18 + Vite
+- TailwindCSS (tema dourado: yellow-600, fundo escuro gray-900)
+- @supabase/supabase-js (auth + banco de dados)
+- Recharts (gráficos)
+- React Router v6
+- vite-plugin-pwa (service worker + manifest)
+- lucide-react (ícones)
+
+### Estrutura de arquivos
+```
+financas-app/
+├── package.json
+├── vite.config.js
+├── tailwind.config.js
+├── postcss.config.js
+├── index.html
+├── .env.example          ← copiar para .env e preencher
+├── .gitignore
+├── supabase/
+│   └── migrations.sql    ← SQL para rodar no Supabase
+├── public/
+│   ├── logo.png          ← logo oficial do Centavus
+│   └── favicon.svg
+└── src/
+    ├── main.jsx
+    ├── App.jsx            ← rotas protegidas
+    ├── index.css          ← Tailwind + utilitários PWA
+    ├── lib/supabase.js
+    ├── contexts/AuthContext.jsx
+    ├── utils/format.js    ← formatCurrency, formatDate, daysUntil, etc.
+    ├── components/
+    │   ├── Layout.jsx
+    │   ├── BottomNav.jsx
+    │   ├── Modal.jsx
+    │   ├── TransactionForm.jsx
+    │   └── BillForm.jsx
+    └── pages/
+        ├── Auth.jsx         ← login/cadastro com logo Centavus
+        ├── Dashboard.jsx    ← saldo, cofrinho, próximas contas, últimas transações
+        ├── Transactions.jsx ← histórico com filtros por mês e tipo
+        ├── Bills.jsx        ← contas a pagar (pagar, vencidas, recorrentes)
+        ├── Summary.jsx      ← gráfico barras 6 meses + pizza por categoria
+        ├── Categories.jsx   ← gerenciar categorias com ícone e cor
+        └── Settings.jsx     ← saldos iniciais
+```
+
+### Banco de dados Supabase — tabelas
+| Tabela | Descrição |
+|--------|-----------|
+| `user_settings` | Saldo inicial e saldo inicial do cofrinho por usuário |
+| `categories` | Categorias de receita/despesa com ícone e cor |
+| `transactions` | Todas as movimentações (income/expense/savings_deposit/savings_withdrawal) |
+| `bills` | Contas a pagar com vencimento, status pago/não pago, recorrência |
+
+### Lógica de saldo
+- **Saldo atual** = `initial_balance` + SUM(income) − SUM(expense) − SUM(savings_deposit) + SUM(savings_withdrawal)
+- **Cofrinho** = `savings_initial` + SUM(savings_deposit) − SUM(savings_withdrawal)
+- Todas as transações ficam na tabela `transactions`, separadas por `type`
+
+### Design
+- Tema dourado escuro: header `gray-900`, botões/acentos `yellow-600`, textos dourados `yellow-400`
+- Logo `public/logo.png` aparece na tela de login e no header do dashboard
+- Bottom navigation com 5 abas: Início, Transações, Contas, Resumo, Categorias
+
+---
+
+## O que falta / próximos passos sugeridos
+
+1. **Configurar Supabase** (ver SETUP.md para instruções completas)
+2. **Criar .env** com as credenciais do Supabase
+3. **Rodar `npm install && npm run dev`** (requer Node.js instalado)
+4. **Testar e ajustar** a experiência de uso
+5. **Possíveis melhorias futuras:**
+   - Notificações push para contas próximas do vencimento
+   - Exportar relatório em PDF/Excel
+   - Múltiplas contas bancárias
+   - Metas de economia
+   - Modo escuro completo
+   - Suporte offline robusto com cache de dados
+
+---
+
+## Como retomar em outra máquina
+
+```bash
+# 1. Clonar o repositório
+git clone https://github.com/mervati/Centavus.git
+cd Centavus
+
+# 2. Instalar dependências (Node.js precisa estar instalado)
+npm install
+
+# 3. Criar o arquivo .env (copiar .env.example e preencher)
+copy .env.example .env
+# Editar .env com URL e anon key do Supabase
+
+# 4. Rodar o app em desenvolvimento
+npm run dev
+# Abre em http://localhost:5173
+
+# 5. Build para produção
+npm run build
+```
+
+---
+
+## Conversa original
+Esta sessão foi iniciada em 2026-07-01 no trabalho (Windows 11).
+A usuária queria um PWA de finanças pessoais com:
+- Saldo atual
+- Cofrinho
+- Contas a pagar com datas
+- Histórico de transações
+- Resumo mensal com gráficos
+- Categorias de gastos
+
+Stack escolhida: React + Vite + Supabase (nuvem).
+O app foi nomeado **Centavus** com logo oficial dourada.

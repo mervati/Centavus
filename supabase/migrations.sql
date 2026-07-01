@@ -69,3 +69,7 @@ create index if not exists idx_transactions_type on transactions(user_id, type);
 create index if not exists idx_bills_user_due on bills(user_id, due_date);
 create index if not exists idx_bills_paid on bills(user_id, paid);
 create index if not exists idx_categories_user on categories(user_id, type);
+
+-- Adição: duração de recorrência (execute no SQL Editor do Supabase)
+alter table bills add column if not exists recurrence_count integer;
+alter table bills add column if not exists recurrence_end_date date;

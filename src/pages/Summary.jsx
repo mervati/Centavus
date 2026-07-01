@@ -118,47 +118,51 @@ export default function Summary() {
           {/* Bar chart */}
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <h3 className="font-semibold text-gray-900 text-sm mb-4">Últimos 6 meses</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={data.monthly} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} />
-                <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
-                <Tooltip
-                  formatter={(value, name) => [formatCurrency(value), name === 'receita' ? 'Receita' : 'Despesa']}
-                  contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
-                />
-                <Bar dataKey="receita" fill="#10b981" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div style={{ width: '100%', overflowX: 'hidden' }}>
+              <ResponsiveContainer width="99%" height={200}>
+                <BarChart data={data.monthly} margin={{ top: 0, right: 8, left: -16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={36} />
+                  <Tooltip
+                    formatter={(value, name) => [formatCurrency(value), name === 'receita' ? 'Receita' : 'Despesa']}
+                    contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                  />
+                  <Bar dataKey="receita" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Pie chart */}
           {data.byCategory.length > 0 && (
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
               <h3 className="font-semibold text-gray-900 text-sm mb-4">Despesas por categoria</h3>
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={data.byCategory}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {data.byCategory.map((_, i) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={v => formatCurrency(v)}
-                    contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
-                  />
-                  <Legend iconType="circle" iconSize={8} formatter={v => <span style={{ fontSize: 11 }}>{v}</span>} />
-                </PieChart>
-              </ResponsiveContainer>
+              <div style={{ width: '100%', overflowX: 'hidden' }}>
+                <ResponsiveContainer width="99%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={data.byCategory}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={55}
+                      outerRadius={85}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {data.byCategory.map((_, i) => (
+                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={v => formatCurrency(v)}
+                      contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                    />
+                    <Legend iconType="circle" iconSize={8} formatter={v => <span style={{ fontSize: 11 }}>{v}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
 
               {/* Category breakdown */}
               <div className="mt-2 space-y-2">

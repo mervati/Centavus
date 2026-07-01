@@ -108,7 +108,7 @@ export default function Dashboard() {
   return (
     <Layout>
       {/* Header */}
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 px-4 pt-10 pb-8 safe-top">
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 px-4 pb-8" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="Centavus" className="w-9 h-9 rounded-xl" />

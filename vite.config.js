@@ -7,7 +7,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
+      includeAssets: ['favicon.svg', 'logo.png'],
       manifest: {
         name: 'Centavus',
         short_name: 'Centavus',
@@ -22,15 +25,8 @@ export default defineConfig({
           { src: 'logo.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ]
       },
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: 'NetworkFirst',
-            options: { cacheName: 'supabase-cache', expiration: { maxEntries: 50 } }
-          }
-        ]
+      injectManifest: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}']
       }
     })
   ]

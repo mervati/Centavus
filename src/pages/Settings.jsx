@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
-import { formatCurrency } from '../utils/format'
-import { Save } from 'lucide-react'
+import { usePushNotifications } from '../hooks/usePushNotifications'
+import { Save, Bell, BellOff } from 'lucide-react'
 
 export default function Settings() {
   const { user, signOut } = useAuth()
@@ -12,6 +12,7 @@ export default function Settings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
+  const { permission, subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications()
 
   const loadData = useCallback(async () => {
     const { data } = await supabase.from('user_settings').select('*').eq('id', user.id).single()
@@ -44,6 +45,36 @@ export default function Settings() {
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 mb-1">Conta</p>
           <p className="font-medium text-gray-900">{user.email}</p>
+        </div>
+
+        {/* Notificações */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${subscribed ? 'bg-yellow-100' : 'bg-gray-100'}`}>
+                {subscribed ? <Bell size={20} className="text-yellow-600" /> : <BellOff size={20} className="text-gray-400" />}
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Lembretes de contas</p>
+                <p className="text-xs text-gray-500">
+                  {permission === 'denied'
+                    ? 'Bloqueado nas configurações do navegador'
+                    : subscribed
+                    ? 'Notificação 1 dia antes do vencimento'
+                    : 'Receba alertas no celular'}
+                </p>
+              </div>
+            </div>
+            {permission !== 'denied' && (
+              <button
+                onClick={subscribed ? unsubscribe : subscribe}
+                disabled={pushLoading}
+                className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 disabled:opacity-60 ${subscribed ? 'bg-yellow-600' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${subscribed ? 'left-7' : 'left-1'}`} />
+              </button>
+            )}
+          </div>
         </div>
 
         {!loading && (

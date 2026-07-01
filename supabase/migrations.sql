@@ -76,3 +76,16 @@ alter table bills add column if not exists recurrence_end_date date;
 
 -- Integração contas x transações: ao pagar uma conta, cria transação automaticamente
 alter table bills add column if not exists transaction_id uuid references transactions(id) on delete set null;
+
+-- Assinaturas de push notification
+create table if not exists push_subscriptions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  endpoint text not null,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz default now(),
+  unique(user_id, endpoint)
+);
+alter table push_subscriptions enable row level security;
+create policy "push_own" on push_subscriptions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

@@ -89,16 +89,25 @@ export default function BillForm({ onSuccess, onCancel, initial }) {
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-        <select
-          value={categoryId}
-          onChange={e => setCategoryId(e.target.value)}
-          className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
-        >
-          <option value="">Sem categoria</option>
+        <div className="border border-gray-300 rounded-xl overflow-y-auto max-h-44">
+          <button
+            type="button"
+            onClick={() => setCategoryId('')}
+            className={`w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 transition-colors ${!categoryId ? 'bg-yellow-50 text-yellow-700 font-medium' : 'text-gray-500 hover:bg-gray-50'}`}
+          >
+            Sem categoria
+          </button>
           {categories.map(c => (
-            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+            <button
+              type="button"
+              key={c.id}
+              onClick={() => setCategoryId(c.id)}
+              className={`w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 transition-colors border-t border-gray-100 ${categoryId === c.id ? 'bg-yellow-50 text-yellow-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
+            >
+              <span>{c.icon}</span> {c.name}
+            </button>
           ))}
-        </select>
+        </div>
       </div>
 
       <label className="flex items-center gap-3 cursor-pointer">

@@ -7,6 +7,7 @@ import Modal from '../components/Modal'
 import TransactionForm from '../components/TransactionForm'
 import { formatCurrency, formatDate, daysUntil, isOverdue, todayISO } from '../utils/format'
 import { Plus, TrendingUp, TrendingDown, PiggyBank, AlertCircle, LogOut, Settings, ChevronRight } from 'lucide-react'
+import { useRecurringTransactions } from '../hooks/useRecurringTransactions'
 
 const DEFAULT_CATEGORIES = [
   { name: 'Salário', type: 'income', color: '#22c55e', icon: '💼' },
@@ -25,6 +26,7 @@ const DEFAULT_CATEGORIES = [
 
 export default function Dashboard() {
   const { user, signOut } = useAuth()
+  useRecurringTransactions()
   const navigate = useNavigate()
   const [settings, setSettings] = useState(null)
   const [balance, setBalance] = useState(0)

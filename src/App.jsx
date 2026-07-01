@@ -7,6 +7,7 @@ import Bills from './pages/Bills'
 import Summary from './pages/Summary'
 import Categories from './pages/Categories'
 import Settings from './pages/Settings'
+import Recurring from './pages/Recurring'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -31,6 +32,7 @@ function AppRoutes() {
       <Route path="/resumo" element={<ProtectedRoute><Summary /></ProtectedRoute>} />
       <Route path="/categorias" element={<ProtectedRoute><Categories /></ProtectedRoute>} />
       <Route path="/configuracoes" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/recorrentes" element={<ProtectedRoute><Recurring /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

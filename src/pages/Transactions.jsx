@@ -5,7 +5,8 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import TransactionForm from '../components/TransactionForm'
 import { formatCurrency, formatDate } from '../utils/format'
-import { Plus, Trash2, Pencil, Filter } from 'lucide-react'
+import { Plus, Trash2, Pencil, RefreshCw } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 const TYPE_LABELS = {
   income: 'Receita',
@@ -30,6 +31,7 @@ const TYPE_SIGNS = {
 
 export default function Transactions() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [transactions, setTransactions] = useState([])
   const [filtered, setFiltered] = useState([])
   const [loading, setLoading] = useState(true)
@@ -81,12 +83,20 @@ export default function Transactions() {
     <Layout
       title="Transações"
       action={
-        <button
-          onClick={() => { setEditing(null); setShowModal(true) }}
-          className="w-8 h-8 bg-yellow-600 rounded-full flex items-center justify-center text-white"
-        >
-          <Plus size={18} />
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => navigate('/recorrentes')}
+            className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-600"
+          >
+            <RefreshCw size={16} />
+          </button>
+          <button
+            onClick={() => { setEditing(null); setShowModal(true) }}
+            className="w-8 h-8 bg-yellow-600 rounded-full flex items-center justify-center text-white"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
       }
     >
       {/* Filters */}

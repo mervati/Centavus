@@ -3,8 +3,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
+import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun } from 'lucide-react'
 import { formatCurrency, todayISO } from '../utils/format'
+import { useTheme } from '../contexts/ThemeContext'
 
 export default function Settings() {
   const { user, signOut } = useAuth()
@@ -17,6 +18,7 @@ export default function Settings() {
   const [rebalancing, setRebalancing] = useState(false)
   const [rebalanceSuccess, setRebalanceSuccess] = useState(false)
   const { permission, subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications()
+  const { dark, toggleDark } = useTheme()
 
   const loadData = useCallback(async () => {
     const [{ data: s }, { data: tx }] = await Promise.all([
@@ -90,6 +92,27 @@ export default function Settings() {
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <p className="text-xs text-gray-500 mb-1">Conta</p>
           <p className="font-medium text-gray-900">{user.email}</p>
+        </div>
+
+        {/* Tema */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-gray-700' : 'bg-yellow-100'}`}>
+                {dark ? <Moon size={20} className="text-yellow-400" /> : <Sun size={20} className="text-yellow-600" />}
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Tema</p>
+                <p className="text-xs text-gray-500">{dark ? 'Modo escuro ativo' : 'Modo claro ativo'}</p>
+              </div>
+            </div>
+            <button
+              onClick={toggleDark}
+              className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${dark ? 'bg-yellow-600' : 'bg-gray-300'}`}
+            >
+              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${dark ? 'left-7' : 'left-1'}`} />
+            </button>
+          </div>
         </div>
 
         {/* Notificações */}

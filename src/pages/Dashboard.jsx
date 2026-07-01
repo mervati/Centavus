@@ -39,6 +39,7 @@ export default function Dashboard() {
   const [initSavings, setInitSavings] = useState('')
   const [setupLoading, setSetupLoading] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [projection, setProjection] = useState(null)
 
   const loadData = useCallback(async () => {
     const [{ data: s }, { data: tx }, { data: bills }] = await Promise.all([
@@ -60,8 +61,26 @@ export default function Dashboard() {
     const savDep = (tx || []).filter(t => t.type === 'savings_deposit').reduce((a, t) => a + Number(t.amount), 0)
     const savWith = (tx || []).filter(t => t.type === 'savings_withdrawal').reduce((a, t) => a + Number(t.amount), 0)
 
-    setBalance(Number(s.initial_balance) + income - expense - savDep + savWith)
-    setSavings(Number(s.savings_initial) + savDep - savWith)
+    const currentBalance = Number(s.initial_balance) + income - expense - savDep + savWith
+    const currentSavings = Number(s.savings_initial) + savDep - savWith
+    setBalance(currentBalance)
+    setSavings(currentSavings)
+
+    // Projeção fim do mês
+    const today = new Date()
+    const dayElapsed = today.getDate()
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+    const daysRemaining = daysInMonth - dayElapsed
+    const currentYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+    const monthTx = (tx || []).filter(t => t.date.startsWith(currentYM))
+    const monthIncome  = monthTx.filter(t => t.type === 'income').reduce((a, t) => a + Number(t.amount), 0)
+    const monthExpense = monthTx.filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0)
+    if (dayElapsed > 0 && daysRemaining > 0) {
+      const dailyNet = (monthIncome - monthExpense) / dayElapsed
+      setProjection(currentBalance + currentSavings + dailyNet * daysRemaining)
+    } else {
+      setProjection(null)
+    }
 
     const recent = [...(tx || [])].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)).slice(0, 5)
     setRecentTx(recent)
@@ -110,7 +129,7 @@ export default function Dashboard() {
   return (
     <Layout>
       {/* Header */}
-      <div className="bg-gradient-to-br from-gray-900 to-gray-800 px-4 pb-8" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 3rem)' }}>
+      <div className="bg-gradient-to-br from-gray-900 to-gray-800 px-4 pb-8" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1.25rem)' }}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <img src="/logo.png" alt="Centavus" className="w-9 h-9 rounded-xl" />
@@ -136,9 +155,14 @@ export default function Dashboard() {
         </div>
 
         <p className="text-yellow-400/80 text-xs uppercase tracking-wide mb-1">Saldo Total</p>
-        <p className={`text-3xl font-bold text-white mb-1 ${(balance + savings) < 0 ? 'text-rose-300' : ''}`}>
+        <p className={`text-3xl font-bold text-white ${(balance + savings) < 0 ? 'text-rose-300' : ''}`}>
           {formatCurrency(balance + savings)}
         </p>
+        {projection !== null && (
+          <p className="text-white/40 text-xs mt-1">
+            {projection >= (balance + savings) ? '↗' : '↘'} Projeção fim do mês: {formatCurrency(projection)}
+          </p>
+        )}
       </div>
 
       {/* Cards */}

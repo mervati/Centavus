@@ -5,7 +5,7 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import BillForm from '../components/BillForm'
 import { formatCurrency, formatDate, daysUntil, isOverdue, todayISO } from '../utils/format'
-import { Plus, Trash2, Pencil, CheckCircle2, Circle, RefreshCw } from 'lucide-react'
+import { Plus, Trash2, Pencil, CheckCircle2, Circle, RefreshCw, Search, X } from 'lucide-react'
 
 export default function Bills() {
   const { user } = useAuth()
@@ -14,6 +14,7 @@ export default function Bills() {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
   const [filter, setFilter] = useState('pending')
+  const [search, setSearch] = useState('')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -72,10 +73,10 @@ export default function Bills() {
   }
 
   const filtered = bills.filter(b => {
-    if (filter === 'all') return true
-    if (filter === 'pending') return !b.paid
-    if (filter === 'paid') return b.paid
-    if (filter === 'overdue') return !b.paid && isOverdue(b.due_date)
+    if (filter === 'pending' && b.paid) return false
+    if (filter === 'paid' && !b.paid) return false
+    if (filter === 'overdue' && (b.paid || !isOverdue(b.due_date))) return false
+    if (search.trim() && !b.description.toLowerCase().includes(search.trim().toLowerCase())) return false
     return true
   })
 
@@ -113,6 +114,23 @@ export default function Bills() {
             <span className="text-2xl">📋</span>
           </div>
         </div>
+      </div>
+
+      {/* Busca */}
+      <div className="px-4 mb-3 relative">
+        <Search size={16} className="absolute left-7 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <input
+          type="text"
+          placeholder="Buscar por descrição..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full border border-gray-300 rounded-xl pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+        />
+        {search && (
+          <button onClick={() => setSearch('')} className="absolute right-7 top-1/2 -translate-y-1/2 text-gray-400">
+            <X size={15} />
+          </button>
+        )}
       </div>
 
       {/* Filters */}

@@ -73,3 +73,6 @@ create index if not exists idx_categories_user on categories(user_id, type);
 -- Adição: duração de recorrência (execute no SQL Editor do Supabase)
 alter table bills add column if not exists recurrence_count integer;
 alter table bills add column if not exists recurrence_end_date date;
+
+-- Integração contas x transações: ao pagar uma conta, cria transação automaticamente
+alter table bills add column if not exists transaction_id uuid references transactions(id) on delete set null;

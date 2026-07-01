@@ -30,10 +30,38 @@ export default function Bills() {
 
   async function togglePaid(bill) {
     const now = new Date().toISOString()
-    await supabase
-      .from('bills')
-      .update({ paid: !bill.paid, paid_at: !bill.paid ? now : null })
-      .eq('id', bill.id)
+    const marking = !bill.paid
+
+    if (marking) {
+      // Cria transação de despesa automaticamente
+      const { data: tx } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          category_id: bill.category_id || null,
+          amount: bill.amount,
+          type: 'expense',
+          description: bill.description,
+          date: todayISO(),
+        })
+        .select('id')
+        .single()
+
+      await supabase
+        .from('bills')
+        .update({ paid: true, paid_at: now, transaction_id: tx?.id ?? null })
+        .eq('id', bill.id)
+    } else {
+      // Remove a transação vinculada ao desmarcar
+      if (bill.transaction_id) {
+        await supabase.from('transactions').delete().eq('id', bill.transaction_id)
+      }
+      await supabase
+        .from('bills')
+        .update({ paid: false, paid_at: null, transaction_id: null })
+        .eq('id', bill.id)
+    }
+
     loadData()
   }
 

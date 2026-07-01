@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import CategorySelect from './CategorySelect'
 import { todayISO } from '../utils/format'
 
 const TYPES = [
@@ -118,25 +119,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
       {(type === 'income' || type === 'expense') && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-          <div className="border border-gray-300 rounded-xl overflow-y-auto max-h-44">
-            <button
-              type="button"
-              onClick={() => setCategoryId('')}
-              className={`w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 transition-colors ${!categoryId ? 'bg-yellow-50 text-yellow-700 font-medium' : 'text-gray-500 hover:bg-gray-50'}`}
-            >
-              Sem categoria
-            </button>
-            {categories.map(c => (
-              <button
-                type="button"
-                key={c.id}
-                onClick={() => setCategoryId(c.id)}
-                className={`w-full px-3 py-2.5 text-left text-sm flex items-center gap-2 transition-colors border-t border-gray-100 ${categoryId === c.id ? 'bg-yellow-50 text-yellow-700 font-medium' : 'text-gray-700 hover:bg-gray-50'}`}
-              >
-                <span>{c.icon}</span> {c.name}
-              </button>
-            ))}
-          </div>
+          <CategorySelect value={categoryId} onChange={setCategoryId} categories={categories} />
         </div>
       )}
 

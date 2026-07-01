@@ -133,32 +133,48 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <p className="text-yellow-400/80 text-xs uppercase tracking-wide mb-1">Saldo atual</p>
-        <p className={`text-3xl font-bold text-white mb-1 ${balance < 0 ? 'text-rose-300' : ''}`}>
-          {formatCurrency(balance)}
+        <p className="text-yellow-400/80 text-xs uppercase tracking-wide mb-1">Saldo Total</p>
+        <p className={`text-3xl font-bold text-white mb-1 ${(balance + savings) < 0 ? 'text-rose-300' : ''}`}>
+          {formatCurrency(balance + savings)}
         </p>
       </div>
 
       {/* Cards */}
-      <div className="px-4 -mt-4 grid grid-cols-2 gap-3 mb-6">
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
-              <PiggyBank size={16} className="text-blue-600" />
+      <div className="px-4 -mt-4 space-y-3 mb-6">
+        {/* Saldo Banco — full width */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 bg-yellow-100 rounded-xl flex items-center justify-center">
+              <TrendingUp size={18} className="text-yellow-600" />
             </div>
-            <span className="text-xs text-gray-500 font-medium">Cofrinho</span>
+            <div>
+              <p className="text-xs text-gray-500 font-medium">Saldo Banco</p>
+              <p className={`text-lg font-bold ${balance < 0 ? 'text-rose-600' : 'text-yellow-700'}`}>{formatCurrency(balance)}</p>
+            </div>
           </div>
-          <p className="text-lg font-bold text-blue-700">{formatCurrency(savings)}</p>
         </div>
 
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center">
-              <AlertCircle size={16} className="text-amber-600" />
+        {/* Cofrinho + A pagar */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-blue-100 rounded-xl flex items-center justify-center">
+                <PiggyBank size={16} className="text-blue-600" />
+              </div>
+              <span className="text-xs text-gray-500 font-medium">Cofrinho</span>
             </div>
-            <span className="text-xs text-gray-500 font-medium">A pagar</span>
+            <p className="text-lg font-bold text-blue-700">{formatCurrency(savings)}</p>
           </div>
-          <p className="text-lg font-bold text-amber-700">{upcomingBills.length} conta{upcomingBills.length !== 1 ? 's' : ''}</p>
+
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 bg-amber-100 rounded-xl flex items-center justify-center">
+                <AlertCircle size={16} className="text-amber-600" />
+              </div>
+              <span className="text-xs text-gray-500 font-medium">A pagar</span>
+            </div>
+            <p className="text-lg font-bold text-amber-700">{upcomingBills.length} conta{upcomingBills.length !== 1 ? 's' : ''}</p>
+          </div>
         </div>
       </div>
 

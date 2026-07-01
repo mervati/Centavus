@@ -116,10 +116,10 @@ export default function Summary() {
           )}
 
           {/* Bar chart */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 overflow-hidden">
             <h3 className="font-semibold text-gray-900 text-sm mb-4">Últimos 6 meses</h3>
             <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={data.monthly} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+              <BarChart data={data.monthly} margin={{ top: 0, right: 4, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} />
                 <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
@@ -135,7 +135,7 @@ export default function Summary() {
 
           {/* Pie chart */}
           {data.byCategory.length > 0 && (
-            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 overflow-hidden">
               <h3 className="font-semibold text-gray-900 text-sm mb-4">Despesas por categoria</h3>
               <ResponsiveContainer width="100%" height={220}>
                 <PieChart>

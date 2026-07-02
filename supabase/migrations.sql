@@ -89,3 +89,43 @@ create table if not exists push_subscriptions (
 );
 alter table push_subscriptions enable row level security;
 create policy "push_own" on push_subscriptions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Rendimento CDI
+alter table user_settings add column if not exists yield_type text default 'none' check (yield_type in ('mercado_pago', 'mercado_pago_meli', 'none'));
+alter table user_settings add column if not exists yield_start_date date;
+alter table user_settings add column if not exists yield_start_balance decimal(12,2) default 0;
+alter table user_settings add column if not exists yield_start_savings decimal(12,2) default 0;
+alter table user_settings add column if not exists last_yield_update date;
+
+-- Cartões de crédito
+create table if not exists credit_cards (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  closing_day integer not null check (closing_day between 1 and 31),
+  color text default '#6366f1',
+  created_at timestamptz default now()
+);
+alter table credit_cards enable row level security;
+create policy "credit_cards_own" on credit_cards for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Novas colunas em transactions para cartão de crédito e carteiras
+alter table transactions drop constraint if exists transactions_type_check;
+alter table transactions add constraint transactions_type_check
+  check (type in ('income','expense','savings_deposit','savings_withdrawal','cofrinho_income','cofrinho_expense','credit_expense'));
+alter table transactions add column if not exists payment_method text default 'pix' check (payment_method in ('pix','credit'));
+alter table transactions add column if not exists wallet text check (wallet in ('banco','cofrinho'));
+alter table transactions add column if not exists card_id uuid references credit_cards(id) on delete set null;
+alter table transactions add column if not exists installments integer default 1;
+alter table transactions add column if not exists installment_number integer default 1;
+alter table transactions add column if not exists bill_month date;
+alter table transactions add column if not exists bill_paid boolean default false;
+alter table transactions add column if not exists total_amount decimal(12,2);
+alter table transactions add column if not exists bill_due_date date;
+
+-- Integração Telegram
+alter table user_settings add column if not exists telegram_chat_id text;
+alter table user_settings add column if not exists telegram_notify_days integer default 3;
+alter table user_settings add column if not exists telegram_notify_days_1 integer default 1;
+alter table user_settings add column if not exists telegram_notify_days_2 integer;
+alter table user_settings add column if not exists telegram_notify_hour integer default 8;

@@ -9,24 +9,33 @@ import { Plus, Trash2, Pencil, RefreshCw, Search, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 const TYPE_LABELS = {
-  income: 'Receita',
-  expense: 'Despesa',
-  savings_deposit: 'Cofrinho +',
-  savings_withdrawal: 'Cofrinho -',
+  income:              'Receita',
+  expense:             'Despesa',
+  savings_deposit:     'Cofrinho +',
+  savings_withdrawal:  'Cofrinho -',
+  cofrinho_income:     'Cofrinho ↓',
+  cofrinho_expense:    'Cofrinho ↑',
+  credit_expense:      'Crédito',
 }
 
 const TYPE_COLORS = {
-  income: 'text-emerald-600',
-  expense: 'text-rose-600',
-  savings_deposit: 'text-blue-600',
+  income:             'text-emerald-600',
+  expense:            'text-rose-600',
+  savings_deposit:    'text-blue-600',
   savings_withdrawal: 'text-orange-500',
+  cofrinho_income:    'text-blue-500',
+  cofrinho_expense:   'text-orange-600',
+  credit_expense:     'text-purple-600',
 }
 
 const TYPE_SIGNS = {
-  income: '+',
-  expense: '-',
-  savings_deposit: '+',
+  income:             '+',
+  expense:            '-',
+  savings_deposit:    '+',
   savings_withdrawal: '+',
+  cofrinho_income:    '+',
+  cofrinho_expense:   '-',
+  credit_expense:     '-',
 }
 
 export default function Transactions() {
@@ -37,6 +46,7 @@ export default function Transactions() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState(null)
+  const [deleteModal, setDeleteModal] = useState(null)
   const [filterType, setFilterType] = useState('all')
   const [search, setSearch] = useState('')
   const [filterMonth, setFilterMonth] = useState(() => {
@@ -48,10 +58,11 @@ export default function Transactions() {
     setLoading(true)
     const { data } = await supabase
       .from('transactions')
-      .select('*, categories(name,icon,color)')
+      .select('*, categories(name,icon,color), credit_cards(name,color)')
       .eq('user_id', user.id)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
+      .order('installment_number', { ascending: true })
     setTransactions(data ?? [])
     setLoading(false)
   }, [user.id])
@@ -73,14 +84,45 @@ export default function Transactions() {
     setFiltered(list)
   }, [transactions, filterType, filterMonth, search])
 
-  async function handleDelete(id) {
-    if (!confirm('Remover esta transação?')) return
-    await supabase.from('transactions').delete().eq('id', id)
+  async function handleDelete(tx) {
+    if (tx.type === 'credit_expense' && tx.installments > 1) {
+      const { data } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('type', 'credit_expense')
+        .eq('card_id', tx.card_id)
+        .eq('date', tx.date)
+        .eq('total_amount', tx.total_amount)
+        .eq('installments', tx.installments)
+      setDeleteModal({ tx, seriesCount: data?.length ?? 1 })
+    } else {
+      if (!confirm('Remover esta transação?')) return
+      await supabase.from('transactions').delete().eq('id', tx.id)
+      loadData()
+    }
+  }
+
+  async function confirmDelete(mode) {
+    const { tx } = deleteModal
+    if (mode === 'single') {
+      await supabase.from('transactions').delete().eq('id', tx.id)
+    } else {
+      await supabase.from('transactions')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('type', 'credit_expense')
+        .eq('card_id', tx.card_id)
+        .eq('date', tx.date)
+        .eq('total_amount', tx.total_amount)
+        .eq('installments', tx.installments)
+    }
+    setDeleteModal(null)
     loadData()
   }
 
   const monthTotal = filtered.reduce((acc, t) => {
-    const sign = ['income', 'savings_withdrawal'].includes(t.type) ? 1 : -1
+    const sign = ['income', 'savings_withdrawal', 'cofrinho_income'].includes(t.type) ? 1 : -1
     return acc + sign * Number(t.amount)
   }, 0)
 
@@ -131,7 +173,7 @@ export default function Transactions() {
           />
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-          {[['all', 'Todas'], ['income', 'Receitas'], ['expense', 'Despesas'], ['savings_deposit', 'Cofrinho +'], ['savings_withdrawal', 'Cofrinho -']].map(([val, label]) => (
+          {[['all','Todas'],['income','Receitas'],['expense','Despesas'],['credit_expense','Crédito'],['savings_deposit','Cofrinho +'],['savings_withdrawal','Cofrinho -']].map(([val, label]) => (
             <button
               key={val}
               onClick={() => setFilterType(val)}
@@ -176,6 +218,7 @@ export default function Transactions() {
                 <p className="font-medium text-gray-900 text-sm truncate">{tx.description}</p>
                 <p className="text-xs text-gray-500">
                   {formatDate(tx.date)} · {tx.categories?.name ?? TYPE_LABELS[tx.type]}
+                  {tx.type === 'credit_expense' && tx.credit_cards?.name ? ` · ${tx.credit_cards.name}` : ''}
                 </p>
               </div>
               <p className={`font-semibold text-sm flex-shrink-0 ${TYPE_COLORS[tx.type]}`}>
@@ -189,7 +232,7 @@ export default function Transactions() {
                   <Pencil size={14} />
                 </button>
                 <button
-                  onClick={() => handleDelete(tx.id)}
+                  onClick={() => handleDelete(tx)}
                   className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-rose-600"
                 >
                   <Trash2 size={14} />
@@ -210,6 +253,42 @@ export default function Transactions() {
           onSuccess={() => { setShowModal(false); loadData() }}
           onCancel={() => setShowModal(false)}
         />
+      </Modal>
+
+      <Modal
+        open={!!deleteModal}
+        onClose={() => setDeleteModal(null)}
+        title="Excluir parcelamento"
+      >
+        {deleteModal && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Esta é a parcela{' '}
+              <strong>{deleteModal.tx.installment_number}/{deleteModal.tx.installments}</strong>{' '}
+              de uma compra parcelada. O que deseja excluir?
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={() => confirmDelete('single')}
+                className="w-full py-3 rounded-xl border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 active:bg-gray-100"
+              >
+                Só esta parcela ({deleteModal.tx.installment_number}/{deleteModal.tx.installments})
+              </button>
+              <button
+                onClick={() => confirmDelete('series')}
+                className="w-full py-3 rounded-xl bg-rose-600 text-white text-sm font-semibold hover:bg-rose-700"
+              >
+                Toda a série ({deleteModal.seriesCount} parcelas)
+              </button>
+              <button
+                onClick={() => setDeleteModal(null)}
+                className="w-full py-2.5 text-gray-400 text-sm"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </Layout>
   )

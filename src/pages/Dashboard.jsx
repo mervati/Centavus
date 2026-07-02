@@ -6,6 +6,7 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import TransactionForm from '../components/TransactionForm'
 import { formatCurrency, formatDate, daysUntil, isOverdue, todayISO } from '../utils/format'
+import { calcYieldInfo } from '../utils/yield'
 import { Plus, TrendingUp, TrendingDown, PiggyBank, AlertCircle, LogOut, Settings, ChevronRight } from 'lucide-react'
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions'
 
@@ -40,6 +41,7 @@ export default function Dashboard() {
   const [setupLoading, setSetupLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [projection, setProjection] = useState(null)
+  const [yieldInfo, setYieldInfo] = useState({ active: false, netBalance: 0, netSavings: 0, grossYieldBank: 0, grossYieldSavings: 0, irLabel: '' })
 
   const loadData = useCallback(async () => {
     const [{ data: s }, { data: tx }, { data: bills }] = await Promise.all([
@@ -56,15 +58,19 @@ export default function Dashboard() {
 
     setSettings(s)
 
-    const income = (tx || []).filter(t => t.type === 'income').reduce((a, t) => a + Number(t.amount), 0)
-    const expense = (tx || []).filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0)
-    const savDep = (tx || []).filter(t => t.type === 'savings_deposit').reduce((a, t) => a + Number(t.amount), 0)
-    const savWith = (tx || []).filter(t => t.type === 'savings_withdrawal').reduce((a, t) => a + Number(t.amount), 0)
+    const sum = (type) => (tx || []).filter(t => t.type === type).reduce((a, t) => a + Number(t.amount), 0)
+    const income   = sum('income')
+    const expense  = sum('expense')
+    const savDep   = sum('savings_deposit')
+    const savWith  = sum('savings_withdrawal')
+    const cofInc   = sum('cofrinho_income')
+    const cofExp   = sum('cofrinho_expense')
 
     const currentBalance = Number(s.initial_balance) + income - expense - savDep + savWith
-    const currentSavings = Number(s.savings_initial) + savDep - savWith
+    const currentSavings = Number(s.savings_initial) + savDep - savWith + cofInc - cofExp
     setBalance(currentBalance)
     setSavings(currentSavings)
+    setYieldInfo(calcYieldInfo(s, currentBalance, currentSavings))
 
     // Projeção fim do mês
     const today = new Date()
@@ -158,6 +164,11 @@ export default function Dashboard() {
         <p className={`text-3xl font-bold text-white ${(balance + savings) < 0 ? 'text-rose-300' : ''}`}>
           {formatCurrency(balance + savings)}
         </p>
+        {yieldInfo.active && (yieldInfo.grossYieldBank + yieldInfo.grossYieldSavings) > 0 && (
+          <p className="text-white/60 text-xs mt-0.5">
+            Líquido est.: {formatCurrency(yieldInfo.netBalance + yieldInfo.netSavings)} · IR {yieldInfo.irLabel}
+          </p>
+        )}
         {projection !== null && (
           <p className="text-white/40 text-xs mt-1">
             {projection >= (balance + savings) ? '↗' : '↘'} Projeção fim do mês: {formatCurrency(projection)}
@@ -176,6 +187,9 @@ export default function Dashboard() {
             <div>
               <p className="text-xs text-gray-500 font-medium">Saldo Banco</p>
               <p className={`text-lg font-bold ${balance < 0 ? 'text-rose-600' : 'text-yellow-700'}`}>{formatCurrency(balance)}</p>
+              {yieldInfo.active && yieldInfo.grossYieldBank > 0 && (
+                <p className="text-xs text-emerald-600 mt-0.5">+{formatCurrency(yieldInfo.grossYieldBank)} rendimento</p>
+              )}
             </div>
           </div>
         </div>
@@ -190,6 +204,9 @@ export default function Dashboard() {
               <span className="text-xs text-gray-500 font-medium">Cofrinho</span>
             </div>
             <p className="text-lg font-bold text-blue-700">{formatCurrency(savings)}</p>
+            {yieldInfo.active && yieldInfo.grossYieldSavings > 0 && (
+              <p className="text-xs text-emerald-600 mt-0.5">+{formatCurrency(yieldInfo.grossYieldSavings)} rendimento</p>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">

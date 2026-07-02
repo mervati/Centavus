@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import TransactionForm from '../components/TransactionForm'
-import { formatCurrency, formatDate } from '../utils/format'
+import { formatCurrency, formatDate, todayISO } from '../utils/format'
 import { Plus, Trash2, Pencil, RefreshCw, Search, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -38,68 +38,137 @@ const TYPE_SIGNS = {
   credit_expense:     '-',
 }
 
+function subtractDays(isoDate, n) {
+  const d = new Date(isoDate + 'T12:00:00')
+  d.setDate(d.getDate() - n)
+  return d.toISOString().split('T')[0]
+}
+
+const BASE_QUERY = '*, categories(name,icon,color), credit_cards(name,color)'
+const BASE_ORDER = q => q
+  .order('date', { ascending: false })
+  .order('created_at', { ascending: false })
+  .order('installment_number', { ascending: true })
+
 export default function Transactions() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [transactions, setTransactions] = useState([])
-  const [filtered, setFiltered] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [deleteModal, setDeleteModal] = useState(null)
-  const [filterType, setFilterType] = useState('all')
-  const [search, setSearch] = useState('')
-  const [filterMonth, setFilterMonth] = useState(() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })
+  const [transactions, setTransactions]   = useState([])
+  const [loading, setLoading]             = useState(true)
+  const [loadingMore, setLoadingMore]     = useState(false)
+  const [hasMore, setHasMore]             = useState(true)
+  const [cutoffDate, setCutoffDate]       = useState(null)
+  const [showModal, setShowModal]         = useState(false)
+  const [editing, setEditing]             = useState(null)
+  const [deleteModal, setDeleteModal]     = useState(null)
+  const [filterType, setFilterType]       = useState('all')
+  const [search, setSearch]               = useState('')
+  const [filterMonth, setFilterMonth]     = useState('')
+  const sentinelRef                       = useRef(null)
 
+  // Carrega os últimos 30 dias
   const loadData = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('transactions')
-      .select('*, categories(name,icon,color), credit_cards(name,color)')
-      .eq('user_id', user.id)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .order('installment_number', { ascending: true })
+    const to   = todayISO()
+    const from = subtractDays(to, 30)
+    const { data } = await BASE_ORDER(
+      supabase.from('transactions').select(BASE_QUERY)
+        .eq('user_id', user.id).gte('date', from).lte('date', to)
+    )
     setTransactions(data ?? [])
+    setCutoffDate(from)
+    setHasMore(true)
     setLoading(false)
   }, [user.id])
 
-  useEffect(() => { loadData() }, [loadData])
+  // Carrega um mês específico (quando filtro de mês é aplicado)
+  const loadMonth = useCallback(async (month) => {
+    setLoading(true)
+    const [y, m] = month.split('-').map(Number)
+    const from = `${y}-${String(m).padStart(2, '0')}-01`
+    const next = new Date(y, m, 1)
+    const to   = next.toISOString().split('T')[0]
+    const { data } = await BASE_ORDER(
+      supabase.from('transactions').select(BASE_QUERY)
+        .eq('user_id', user.id).gte('date', from).lt('date', to)
+    )
+    setTransactions(data ?? [])
+    setHasMore(false)
+    setLoading(false)
+  }, [user.id])
+
+  // Carrega os próximos 30 dias (scroll infinito)
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !cutoffDate || filterMonth) return
+    setLoadingMore(true)
+    const to   = cutoffDate
+    const from = subtractDays(to, 30)
+    const { data } = await BASE_ORDER(
+      supabase.from('transactions').select(BASE_QUERY)
+        .eq('user_id', user.id).gte('date', from).lt('date', to)
+    )
+    if (!data || data.length === 0) {
+      setHasMore(false)
+    } else {
+      setTransactions(prev => [...prev, ...data])
+      setCutoffDate(from)
+    }
+    setLoadingMore(false)
+  }, [cutoffDate, filterMonth, hasMore, loadingMore, user.id])
+
+  // Recarrega dados respeitando o filtro ativo
+  const refreshData = useCallback(() => {
+    if (filterMonth) loadMonth(filterMonth)
+    else loadData()
+  }, [filterMonth, loadData, loadMonth])
 
   useEffect(() => {
+    if (filterMonth) loadMonth(filterMonth)
+    else loadData()
+  }, [filterMonth]) // eslint-disable-line
+
+  // Scroll infinito via IntersectionObserver
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || filterMonth || !hasMore) return
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) loadMore() },
+      { rootMargin: '120px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [loadMore, filterMonth, hasMore])
+
+  // Filtragem client-side (tipo e busca)
+  const filtered = useMemo(() => {
     let list = transactions
-    if (filterMonth) {
-      list = list.filter(t => t.date.startsWith(filterMonth))
-    }
-    if (filterType !== 'all') {
-      list = list.filter(t => t.type === filterType)
-    }
+    if (filterType !== 'all') list = list.filter(t => t.type === filterType)
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter(t => t.description.toLowerCase().includes(q))
     }
-    setFiltered(list)
-  }, [transactions, filterType, filterMonth, search])
+    return list
+  }, [transactions, filterType, search])
+
+  const monthTotal = useMemo(() =>
+    filtered.reduce((acc, t) => {
+      const sign = ['income', 'savings_withdrawal', 'cofrinho_income'].includes(t.type) ? 1 : -1
+      return acc + sign * Number(t.amount)
+    }, 0)
+  , [filtered])
 
   async function handleDelete(tx) {
     if (tx.type === 'credit_expense' && tx.installments > 1) {
       const { data } = await supabase
-        .from('transactions')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('type', 'credit_expense')
-        .eq('card_id', tx.card_id)
-        .eq('date', tx.date)
-        .eq('total_amount', tx.total_amount)
-        .eq('installments', tx.installments)
+        .from('transactions').select('id')
+        .eq('user_id', user.id).eq('type', 'credit_expense')
+        .eq('card_id', tx.card_id).eq('date', tx.date)
+        .eq('total_amount', tx.total_amount).eq('installments', tx.installments)
       setDeleteModal({ tx, seriesCount: data?.length ?? 1 })
     } else {
       if (!confirm('Remover esta transação?')) return
       await supabase.from('transactions').delete().eq('id', tx.id)
-      loadData()
+      refreshData()
     }
   }
 
@@ -108,23 +177,14 @@ export default function Transactions() {
     if (mode === 'single') {
       await supabase.from('transactions').delete().eq('id', tx.id)
     } else {
-      await supabase.from('transactions')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('type', 'credit_expense')
-        .eq('card_id', tx.card_id)
-        .eq('date', tx.date)
-        .eq('total_amount', tx.total_amount)
-        .eq('installments', tx.installments)
+      await supabase.from('transactions').delete()
+        .eq('user_id', user.id).eq('type', 'credit_expense')
+        .eq('card_id', tx.card_id).eq('date', tx.date)
+        .eq('total_amount', tx.total_amount).eq('installments', tx.installments)
     }
     setDeleteModal(null)
-    loadData()
+    refreshData()
   }
-
-  const monthTotal = filtered.reduce((acc, t) => {
-    const sign = ['income', 'savings_withdrawal', 'cofrinho_income'].includes(t.type) ? 1 : -1
-    return acc + sign * Number(t.amount)
-  }, 0)
 
   return (
     <Layout
@@ -148,7 +208,6 @@ export default function Transactions() {
     >
       {/* Filters */}
       <div className="px-4 py-3 space-y-3">
-        {/* Busca */}
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input
@@ -164,14 +223,27 @@ export default function Transactions() {
             </button>
           )}
         </div>
-        <div className="flex gap-2">
+
+        <div className="relative flex items-center gap-2">
           <input
             type="month"
             value={filterMonth}
             onChange={e => setFilterMonth(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            className="flex-1 min-w-0 max-w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
           />
+          {filterMonth && (
+            <button
+              onClick={() => setFilterMonth('')}
+              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-500"
+            >
+              <X size={14} />
+            </button>
+          )}
+          {!filterMonth && (
+            <span className="flex-shrink-0 text-xs text-gray-400 whitespace-nowrap">Últimos 30 dias</span>
+          )}
         </div>
+
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
           {[['all','Todas'],['income','Receitas'],['expense','Despesas'],['credit_expense','Crédito'],['savings_deposit','Cofrinho +'],['savings_withdrawal','Cofrinho -']].map(([val, label]) => (
             <button
@@ -240,26 +312,33 @@ export default function Transactions() {
               </div>
             </div>
           ))}
+
+          {/* Sentinel + feedback de carregamento */}
+          {!filterMonth && (
+            <>
+              <div ref={sentinelRef} className="h-1" />
+              {loadingMore && (
+                <div className="flex justify-center py-4">
+                  <div className="w-5 h-5 border-4 border-yellow-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+              {!hasMore && (
+                <p className="text-center text-xs text-gray-400 py-3">Todas as transações carregadas</p>
+              )}
+            </>
+          )}
         </div>
       )}
 
-      <Modal
-        open={showModal}
-        onClose={() => setShowModal(false)}
-        title={editing ? 'Editar transação' : 'Nova transação'}
-      >
+      <Modal open={showModal} onClose={() => setShowModal(false)} title={editing ? 'Editar transação' : 'Nova transação'}>
         <TransactionForm
           initial={editing}
-          onSuccess={() => { setShowModal(false); loadData() }}
+          onSuccess={() => { setShowModal(false); refreshData() }}
           onCancel={() => setShowModal(false)}
         />
       </Modal>
 
-      <Modal
-        open={!!deleteModal}
-        onClose={() => setDeleteModal(null)}
-        title="Excluir parcelamento"
-      >
+      <Modal open={!!deleteModal} onClose={() => setDeleteModal(null)} title="Excluir parcelamento">
         {deleteModal && (
           <div className="space-y-4">
             <p className="text-sm text-gray-600">

@@ -84,6 +84,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
     setAmount(String(initial.amount ?? ''))
     setDescription(initial.description ?? '')
     setDate(initial.date ?? todayISO())
+    setCategoryId(initial.category_id || '')
     pendingCatId.current = initial.category_id || ''
   }, [initial])
 

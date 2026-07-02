@@ -6,7 +6,7 @@
   html {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-tap-highlight-color: transparent;
-    overflow-x: hidden;
+    overflow-y: auto;
     overscroll-behavior-x: none;
     touch-action: pan-y;
     width: 100%;
@@ -14,13 +14,13 @@
   body {
     @apply bg-gray-50 text-gray-900;
     overscroll-behavior: none;
-    overflow-x: hidden;
+    overflow-x: clip;
     touch-action: pan-y;
     width: 100%;
     position: relative;
   }
   #root {
-    overflow-x: hidden;
+    overflow-x: clip;
     touch-action: pan-y;
     width: 100%;
     min-height: 100dvh;

@@ -6,6 +6,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications'
 import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun, Check, TrendingUp, CreditCard, Trash2, Plus, Send, CheckCircle2, ExternalLink } from 'lucide-react'
 import { formatCurrency, todayISO } from '../utils/format'
 import { useTheme } from '../contexts/ThemeContext'
+import CurrencyInput from '../components/CurrencyInput'
 
 const CARD_COLORS = ['#6366f1','#3b82f6','#22c55e','#ef4444','#f97316','#ec4899','#eab308','#6b7280']
 
@@ -36,7 +37,9 @@ export default function Settings() {
   const [newCardName, setNewCardName] = useState('')
   const [newCardDay, setNewCardDay] = useState('')
   const [newCardColor, setNewCardColor] = useState('#6366f1')
+  const [newCardLimit, setNewCardLimit] = useState(0)
   const [addingCard, setAddingCard] = useState(false)
+  const [cardUsage, setCardUsage] = useState({})
   const [telegramChatId, setTelegramChatId]   = useState(null)
   const [telegramDays1, setTelegramDays1]     = useState(1)
   const [telegramDays2, setTelegramDays2]     = useState(null)
@@ -45,12 +48,23 @@ export default function Settings() {
   const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
 
   const loadData = useCallback(async () => {
-    const [{ data: s }, { data: tx }, { data: c }] = await Promise.all([
+    const [{ data: s }, { data: tx }, { data: c }, { data: creditTx }] = await Promise.all([
       supabase.from('user_settings').select('*').eq('id', user.id).single(),
       supabase.from('transactions').select('amount,type').eq('user_id', user.id),
       supabase.from('credit_cards').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('transactions')
+        .select('card_id, amount')
+        .eq('user_id', user.id)
+        .eq('type', 'credit_expense')
+        .eq('bill_paid', false),
     ])
     setCards(c ?? [])
+    const usage = {}
+    for (const t of (creditTx || [])) {
+      if (!t.card_id) continue
+      usage[t.card_id] = (usage[t.card_id] || 0) + Number(t.amount)
+    }
+    setCardUsage(usage)
     if (s) {
       setYieldType(s.yield_type || 'none')
       setTelegramChatId(s.telegram_chat_id || null)
@@ -124,8 +138,9 @@ export default function Settings() {
     setAddingCard(true)
     await supabase.from('credit_cards').insert({
       user_id: user.id, name: newCardName.trim(), closing_day: day, color: newCardColor,
+      credit_limit: newCardLimit > 0 ? newCardLimit : null,
     })
-    setNewCardName(''); setNewCardDay(''); setNewCardColor('#6366f1'); setShowAddCard(false)
+    setNewCardName(''); setNewCardDay(''); setNewCardColor('#6366f1'); setNewCardLimit(0); setShowAddCard(false)
     setAddingCard(false)
     loadData()
   }
@@ -384,19 +399,44 @@ export default function Settings() {
 
           {cards.length > 0 && (
             <div className="px-4 pb-3 space-y-2 border-t border-gray-100 pt-3">
-              {cards.map(card => (
-                <div key={card.id} className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: card.color }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{card.name}</p>
-                    <p className="text-xs text-gray-500">Fecha dia {card.closing_day}</p>
+              {cards.map(card => {
+                const used  = cardUsage[card.id] || 0
+                const limit = Number(card.credit_limit) || 0
+                const pct   = limit > 0 ? Math.min((used / limit) * 100, 100) : 0
+                const barColor = pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                return (
+                  <div key={card.id} className="flex items-start gap-3">
+                    <div className="w-3 h-3 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: card.color }} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{card.name}</p>
+                      <p className="text-xs text-gray-500">Fecha dia {card.closing_day}</p>
+                      {limit > 0 && (
+                        <div className="mt-1.5">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-gray-500">
+                              <span className={pct >= 90 ? 'text-rose-600 font-semibold' : pct >= 70 ? 'text-amber-600 font-semibold' : 'text-gray-700'}>
+                                {formatCurrency(used)}
+                              </span>
+                              {' '}usado
+                            </span>
+                            <span className="text-gray-400">{formatCurrency(limit - used)} disponível</span>
+                          </div>
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${barColor}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => handleDeleteCard(card.id)}
+                      className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-rose-500 flex-shrink-0">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
-                  <button onClick={() => handleDeleteCard(card.id)}
-                    className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-rose-500">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
 
@@ -413,6 +453,10 @@ export default function Settings() {
                 <input type="number" min="1" max="31" placeholder="Ex: 15"
                   value={newCardDay} onChange={e => setNewCardDay(e.target.value)}
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Limite do cartão (R$)</label>
+                <CurrencyInput value={newCardLimit} onChange={setNewCardLimit} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-2">Cor</label>

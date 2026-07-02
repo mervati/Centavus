@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import CategorySelect from './CategorySelect'
@@ -37,6 +37,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
   const [cards, setCards]               = useState([])
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState('')
+  const pendingCatId = useRef(null)
 
   const isTransfer  = mainType === 'transfer' || mainType === 'transfer_out'
   const isPayFlow   = mainType === 'income' || mainType === 'expense'
@@ -50,8 +51,41 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
   useEffect(() => {
     const catType = mainType === 'income' ? 'income' : 'expense'
     supabase.from('categories').select('*').eq('user_id', user.id).eq('type', catType).order('name')
-      .then(({ data }) => { setCategories(data ?? []); setCategoryId('') })
+      .then(({ data }) => {
+        setCategories(data ?? [])
+        if (pendingCatId.current !== null) {
+          setCategoryId(pendingCatId.current)
+          pendingCatId.current = null
+        } else {
+          setCategoryId('')
+        }
+      })
   }, [mainType, user.id])
+
+  // Preenche o formulário ao editar
+  useEffect(() => {
+    if (!initial?.id) return
+    const t = initial.type
+
+    if (t === 'savings_deposit')   { setMainType('transfer');     setPayMethod('') }
+    else if (t === 'savings_withdrawal') { setMainType('transfer_out'); setPayMethod('') }
+    else if (t === 'credit_expense') {
+      setMainType('expense')
+      setPayMethod('credit')
+      setSelectedCard(initial.card_id || null)
+      setInstallments(initial.installments || 1)
+    } else {
+      const main = (t === 'income' || t === 'cofrinho_income') ? 'income' : 'expense'
+      setMainType(main)
+      setPayMethod('pix')
+      setWallet(t === 'cofrinho_income' || t === 'cofrinho_expense' ? 'cofrinho' : (initial.wallet || 'banco'))
+    }
+
+    setAmount(String(initial.amount ?? ''))
+    setDescription(initial.description ?? '')
+    setDate(initial.date ?? todayISO())
+    pendingCatId.current = initial.category_id || ''
+  }, [initial])
 
   function selectMain(type) {
     setMainType(type)

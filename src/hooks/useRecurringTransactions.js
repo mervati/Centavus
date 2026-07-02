@@ -21,16 +21,25 @@ export function useRecurringTransactions() {
 
     const today = todayISO()
 
+    // Batch: busca meses já gerados de todos os recorrentes de uma vez
+    const ids = list.map(rt => rt.id)
+    const { data: allExisting } = await supabase
+      .from('transactions')
+      .select('date, recurring_transaction_id')
+      .in('recurring_transaction_id', ids)
+
+    const coveredByRt = {}
+    for (const t of (allExisting || [])) {
+      const rid = t.recurring_transaction_id
+      if (!coveredByRt[rid]) coveredByRt[rid] = new Set()
+      coveredByRt[rid].add(t.date.slice(0, 7))
+    }
+
+    const toInsert = []
+
     for (const rt of list) {
-      // Busca todos os meses já gerados para esse recorrente
-      const { data: existing } = await supabase
-        .from('transactions')
-        .select('date')
-        .eq('recurring_transaction_id', rt.id)
+      const coveredMonths = coveredByRt[rt.id] || new Set()
 
-      const coveredMonths = new Set((existing || []).map(t => t.date.slice(0, 7)))
-
-      // Itera do mês inicial até o mês atual
       const startParts = rt.start_date.split('-')
       let year = parseInt(startParts[0])
       let month = parseInt(startParts[1])
@@ -43,21 +52,19 @@ export function useRecurringTransactions() {
         const ym = `${year}-${pad(month)}`
 
         if (!coveredMonths.has(ym)) {
-          // Calcula o último dia do mês para não ultrapassar
           const lastDay = new Date(year, month, 0).getDate()
           const day = Math.min(rt.day_of_month, lastDay)
           const txDate = `${ym}-${pad(day)}`
 
-          // Só gera se a data já passou ou é hoje
           if (txDate <= today) {
             if (!rt.end_date || txDate <= rt.end_date) {
-              await supabase.from('transactions').insert({
-                user_id: user.id,
-                category_id: rt.category_id || null,
-                amount: rt.amount,
-                type: rt.type,
-                description: rt.description,
-                date: txDate,
+              toInsert.push({
+                user_id:                  user.id,
+                category_id:              rt.category_id || null,
+                amount:                   rt.amount,
+                type:                     rt.type,
+                description:              rt.description,
+                date:                     txDate,
                 recurring_transaction_id: rt.id,
               })
             }
@@ -67,6 +74,10 @@ export function useRecurringTransactions() {
         month++
         if (month > 12) { month = 1; year++ }
       }
+    }
+
+    if (toInsert.length > 0) {
+      await supabase.from('transactions').insert(toInsert)
     }
   }, [user])
 

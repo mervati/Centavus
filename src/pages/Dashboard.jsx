@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -29,24 +29,62 @@ export default function Dashboard() {
   const { user, signOut } = useAuth()
   useRecurringTransactions()
   const navigate = useNavigate()
-  const [settings, setSettings] = useState(null)
-  const [balance, setBalance] = useState(0)
-  const [savings, setSavings] = useState(0)
-  const [recentTx, setRecentTx] = useState([])
+  const [settings, setSettings]         = useState(null)
+  const [rawTx, setRawTx]               = useState([])   // lean: {amount, type, date}
+  const [recentTx, setRecentTx]         = useState([])
   const [upcomingBills, setUpcomingBills] = useState([])
-  const [showTxModal, setShowTxModal] = useState(false)
+  const [showTxModal, setShowTxModal]   = useState(false)
   const [showSetupModal, setShowSetupModal] = useState(false)
-  const [initBalance, setInitBalance] = useState('')
-  const [initSavings, setInitSavings] = useState('')
+  const [initBalance, setInitBalance]   = useState('')
+  const [initSavings, setInitSavings]   = useState('')
   const [setupLoading, setSetupLoading] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [projection, setProjection] = useState(null)
-  const [yieldInfo, setYieldInfo] = useState({ active: false, netBalance: 0, netSavings: 0, grossYieldBank: 0, grossYieldSavings: 0, irLabel: '' })
+  const [loading, setLoading]           = useState(true)
+
+  // Valores derivados — recalculam só quando rawTx ou settings mudam
+  const balance = useMemo(() => {
+    if (!settings) return 0
+    const sum = type => rawTx.filter(t => t.type === type).reduce((a, t) => a + Number(t.amount), 0)
+    return Number(settings.initial_balance) + sum('income') - sum('expense') - sum('savings_deposit') + sum('savings_withdrawal')
+  }, [rawTx, settings])
+
+  const savings = useMemo(() => {
+    if (!settings) return 0
+    const sum = type => rawTx.filter(t => t.type === type).reduce((a, t) => a + Number(t.amount), 0)
+    return Number(settings.savings_initial) + sum('savings_deposit') - sum('savings_withdrawal') + sum('cofrinho_income') - sum('cofrinho_expense')
+  }, [rawTx, settings])
+
+  const yieldInfo = useMemo(() =>
+    settings
+      ? calcYieldInfo(settings, balance, savings)
+      : { active: false, netBalance: 0, netSavings: 0, grossYieldBank: 0, grossYieldSavings: 0, irLabel: '' }
+  , [settings, balance, savings])
+
+  const projection = useMemo(() => {
+    if (!settings || rawTx.length === 0) return null
+    const today = new Date()
+    const dayElapsed = today.getDate()
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+    const daysRemaining = daysInMonth - dayElapsed
+    if (dayElapsed <= 0 || daysRemaining <= 0) return null
+    const currentYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+    const monthTx = rawTx.filter(t => t.date.startsWith(currentYM))
+    const monthIncome  = monthTx.filter(t => t.type === 'income').reduce((a, t) => a + Number(t.amount), 0)
+    const monthExpense = monthTx.filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0)
+    return balance + savings + ((monthIncome - monthExpense) / dayElapsed) * daysRemaining
+  }, [rawTx, settings, balance, savings])
 
   const loadData = useCallback(async () => {
-    const [{ data: s }, { data: tx }, { data: bills }] = await Promise.all([
+    const [{ data: s }, { data: tx }, { data: recent }, { data: bills }] = await Promise.all([
       supabase.from('user_settings').select('*').eq('id', user.id).single(),
-      supabase.from('transactions').select('*, categories(name,icon,color)').eq('user_id', user.id),
+      // lean: só amount/type/date para calcular saldo — sem join de categorias
+      supabase.from('transactions').select('amount,type,date').eq('user_id', user.id),
+      // rico: últimas 5 transações com categorias para exibição
+      supabase.from('transactions')
+        .select('*, categories(name,icon,color)')
+        .eq('user_id', user.id)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(5),
       supabase.from('bills').select('*').eq('user_id', user.id).eq('paid', false).gte('due_date', todayISO()).order('due_date').limit(5),
     ])
 
@@ -57,39 +95,8 @@ export default function Dashboard() {
     }
 
     setSettings(s)
-
-    const sum = (type) => (tx || []).filter(t => t.type === type).reduce((a, t) => a + Number(t.amount), 0)
-    const income   = sum('income')
-    const expense  = sum('expense')
-    const savDep   = sum('savings_deposit')
-    const savWith  = sum('savings_withdrawal')
-    const cofInc   = sum('cofrinho_income')
-    const cofExp   = sum('cofrinho_expense')
-
-    const currentBalance = Number(s.initial_balance) + income - expense - savDep + savWith
-    const currentSavings = Number(s.savings_initial) + savDep - savWith + cofInc - cofExp
-    setBalance(currentBalance)
-    setSavings(currentSavings)
-    setYieldInfo(calcYieldInfo(s, currentBalance, currentSavings))
-
-    // Projeção fim do mês
-    const today = new Date()
-    const dayElapsed = today.getDate()
-    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-    const daysRemaining = daysInMonth - dayElapsed
-    const currentYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
-    const monthTx = (tx || []).filter(t => t.date.startsWith(currentYM))
-    const monthIncome  = monthTx.filter(t => t.type === 'income').reduce((a, t) => a + Number(t.amount), 0)
-    const monthExpense = monthTx.filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0)
-    if (dayElapsed > 0 && daysRemaining > 0) {
-      const dailyNet = (monthIncome - monthExpense) / dayElapsed
-      setProjection(currentBalance + currentSavings + dailyNet * daysRemaining)
-    } else {
-      setProjection(null)
-    }
-
-    const recent = [...(tx || [])].sort((a, b) => b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at)).slice(0, 5)
-    setRecentTx(recent)
+    setRawTx(tx ?? [])
+    setRecentTx(recent ?? [])
     setUpcomingBills(bills || [])
     setLoading(false)
   }, [user.id])
@@ -105,7 +112,6 @@ export default function Dashboard() {
       savings_initial: Number(initSavings) || 0,
     })
     if (!error) {
-      // Insert default categories
       await supabase.from('categories').insert(
         DEFAULT_CATEGORIES.map(c => ({ ...c, user_id: user.id }))
       )

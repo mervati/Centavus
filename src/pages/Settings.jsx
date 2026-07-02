@@ -145,6 +145,7 @@ export default function Settings() {
     const d1 = days1 !== undefined ? days1 : telegramDays1
     const d2 = days2 !== undefined ? days2 : telegramDays2
     const h  = hour  !== undefined ? hour  : telegramHour
+    if (d1 === telegramDays1 && d2 === telegramDays2 && h === telegramHour) return
     setTelegramDays1(d1)
     setTelegramDays2(d2)
     setTelegramHour(h)

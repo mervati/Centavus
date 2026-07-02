@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import CategorySelect from './CategorySelect'
+import CurrencyInput from './CurrencyInput'
 import { todayISO } from '../utils/format'
 
 export default function BillForm({ onSuccess, onCancel, initial }) {
   const { user } = useAuth()
   const [description, setDescription] = useState(initial?.description ?? '')
-  const [amount, setAmount] = useState(initial?.amount ?? '')
+  const [amount, setAmount] = useState(initial?.amount ?? 0)
   const [dueDate, setDueDate] = useState(initial?.due_date ?? todayISO())
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? '')
   const [recurring, setRecurring] = useState(initial?.recurring ?? false)
@@ -35,13 +36,13 @@ export default function BillForm({ onSuccess, onCancel, initial }) {
     e.preventDefault()
     setError('')
     if (!description.trim()) return setError('Informe uma descrição.')
-    if (!amount || Number(amount) <= 0) return setError('Informe um valor válido.')
+    if (!amount || amount <= 0) return setError('Informe um valor válido.')
     setLoading(true)
 
     const row = {
       user_id: user.id,
       description: description.trim(),
-      amount: Number(amount),
+      amount,
       due_date: dueDate,
       category_id: categoryId || null,
       recurring,
@@ -74,18 +75,7 @@ export default function BillForm({ onSuccess, onCancel, initial }) {
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
-        <input
-          type="number"
-          step="0.01"
-          min="0.01"
-          placeholder="0,00"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500"
-        />
-      </div>
+      <CurrencyInput label="Valor (R$)" value={amount} onChange={setAmount} />
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Vencimento</label>

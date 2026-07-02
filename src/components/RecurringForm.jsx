@@ -2,12 +2,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import CategorySelect from './CategorySelect'
+import CurrencyInput from './CurrencyInput'
 
 export default function RecurringForm({ initial, onSuccess, onCancel }) {
   const { user } = useAuth()
   const [type, setType] = useState(initial?.type ?? 'income')
   const [description, setDescription] = useState(initial?.description ?? '')
-  const [amount, setAmount] = useState(initial?.amount ?? '')
+  const [amount, setAmount] = useState(initial?.amount ?? 0)
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? '')
   const [categories, setCategories] = useState([])
   const [dayOfMonth, setDayOfMonth] = useState(initial?.day_of_month ?? 5)
@@ -38,14 +39,14 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
   async function handleSubmit(e) {
     e.preventDefault()
     if (!description.trim()) return setError('Informe uma descrição.')
-    if (!amount || Number(amount) <= 0) return setError('Informe um valor válido.')
+    if (!amount || amount <= 0) return setError('Informe um valor válido.')
     if (dayOfMonth < 1 || dayOfMonth > 28) return setError('Dia deve ser entre 1 e 28.')
 
     setLoading(true)
     const row = {
       user_id: user.id,
       description: description.trim(),
-      amount: Number(amount),
+      amount,
       type,
       category_id: categoryId || null,
       day_of_month: Number(dayOfMonth),
@@ -97,18 +98,7 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
       </div>
 
       {/* Valor */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
-        <input
-          type="number"
-          step="0.01"
-          min="0.01"
-          value={amount}
-          onChange={e => setAmount(e.target.value)}
-          placeholder="0,00"
-          className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500"
-        />
-      </div>
+      <CurrencyInput label="Valor (R$)" value={amount} onChange={setAmount} />
 
       {/* Categoria */}
       <div>

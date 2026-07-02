@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import CategorySelect from './CategorySelect'
+import CurrencyInput from './CurrencyInput'
 import { todayISO, formatCurrency } from '../utils/format'
 import { CreditCard, Wallet, PiggyBank, AlertCircle } from 'lucide-react'
 
@@ -29,7 +30,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
   const [wallet, setWallet]             = useState('banco')
   const [selectedCard, setSelectedCard] = useState(null)
   const [installments, setInstallments] = useState(1)
-  const [amount, setAmount]             = useState('')
+  const [amount, setAmount]             = useState(0)
   const [description, setDescription]   = useState('')
   const [date, setDate]                 = useState(todayISO())
   const [categoryId, setCategoryId]     = useState('')
@@ -56,7 +57,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
         if (pendingCatId.current !== null) {
           setCategoryId(pendingCatId.current)
           pendingCatId.current = null
-        } else {
+        } else if (!initial?.id) {
           setCategoryId('')
         }
       })
@@ -81,7 +82,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
       setWallet(t === 'cofrinho_income' || t === 'cofrinho_expense' ? 'cofrinho' : (initial.wallet || 'banco'))
     }
 
-    setAmount(String(initial.amount ?? ''))
+    setAmount(initial.amount ?? 0)
     setDescription(initial.description ?? '')
     setDate(initial.date ?? todayISO())
     setCategoryId(initial.category_id || '')
@@ -107,35 +108,54 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
-    if (!amount || Number(amount) <= 0) return setError('Informe um valor válido.')
+    if (!amount || amount <= 0) return setError('Informe um valor válido.')
     if (!description.trim()) return setError('Informe uma descrição.')
     if (payMethod === 'credit' && !selectedCard) return setError('Selecione um cartão.')
     setLoading(true)
 
     const type     = resolveType()
-    const totalAmt = Number(amount)
+    const totalAmt = amount
 
     if (type === 'credit_expense') {
-      const card        = cards.find(c => c.id === selectedCard)
-      const installAmt  = Math.round(totalAmt / installments * 100) / 100
-      const rows = Array.from({ length: installments }, (_, i) => ({
-        user_id:            user.id,
-        type:               'credit_expense',
-        amount:             installAmt,
-        total_amount:       totalAmt,
-        description:        installments > 1 ? `${description.trim()} ${i + 1}/${installments}` : description.trim(),
-        date,
-        category_id:        categoryId || null,
-        payment_method:     'credit',
-        card_id:            selectedCard,
-        installments,
-        installment_number: i + 1,
-        bill_month:         calcBillMonth(date, card.closing_day, i),
-        bill_paid:          false,
-      }))
-      const { error: err } = await supabase.from('transactions').insert(rows)
-      setLoading(false)
-      if (err) return setError(err.message)
+      const card = cards.find(c => c.id === selectedCard)
+      if (initial?.id) {
+        // Edição: atualiza apenas a parcela específica
+        const installNum = initial.installment_number ?? 1
+        const totalInst  = initial.installments ?? 1
+        const row = {
+          amount:             Math.round(totalAmt / totalInst * 100) / 100,
+          total_amount:       totalAmt,
+          description:        totalInst > 1 ? `${description.trim()} ${installNum}/${totalInst}` : description.trim(),
+          date,
+          category_id:        categoryId || null,
+          card_id:            selectedCard,
+          bill_month:         calcBillMonth(date, card?.closing_day ?? 1, installNum - 1),
+        }
+        const { error: err } = await supabase.from('transactions').update(row).eq('id', initial.id)
+        setLoading(false)
+        if (err) return setError(err.message)
+      } else {
+        // Nova transação: insere todas as parcelas
+        const installAmt = Math.round(totalAmt / installments * 100) / 100
+        const rows = Array.from({ length: installments }, (_, i) => ({
+          user_id:            user.id,
+          type:               'credit_expense',
+          amount:             installAmt,
+          total_amount:       totalAmt,
+          description:        installments > 1 ? `${description.trim()} ${i + 1}/${installments}` : description.trim(),
+          date,
+          category_id:        categoryId || null,
+          payment_method:     'credit',
+          card_id:            selectedCard,
+          installments,
+          installment_number: i + 1,
+          bill_month:         calcBillMonth(date, card.closing_day, i),
+          bill_paid:          false,
+        }))
+        const { error: err } = await supabase.from('transactions').insert(rows)
+        setLoading(false)
+        if (err) return setError(err.message)
+      }
     } else {
       const row = {
         user_id:        user.id,
@@ -156,8 +176,8 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
     onSuccess()
   }
 
-  const installAmt = installments > 1 && Number(amount) > 0
-    ? formatCurrency(Math.round(Number(amount) / installments * 100) / 100)
+  const installAmt = installments > 1 && amount > 0
+    ? formatCurrency(Math.round(amount / installments * 100) / 100)
     : null
 
   return (
@@ -256,10 +276,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
       {showDetails && (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Valor (R$)</label>
-            <input type="number" step="0.01" min="0.01" placeholder="0,00" autoFocus
-              value={amount} onChange={e => setAmount(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+            <CurrencyInput label="Valor (R$)" value={amount} onChange={setAmount} autoFocus />
             {payMethod === 'credit' && installAmt && (
               <p className="text-xs text-gray-500 mt-1">{installments}x de {installAmt}</p>
             )}

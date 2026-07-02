@@ -381,12 +381,12 @@ export default function Bills() {
                       <p className="text-xs text-gray-500 mb-0.5">Total da fatura</p>
                       <p className="font-bold text-gray-900 text-lg">{formatCurrency(fatura.total)}</p>
                     </div>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       {editingFatura === fatura.key ? (
                         <input type="date" value={editDueDate}
                           onChange={e => setEditDueDate(e.target.value)}
                           onBlur={() => saveFaturaDueDate(fatura, editDueDate)}
-                          className="text-xs border border-purple-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                          className="text-xs border border-purple-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-400 max-w-full"
                           autoFocus />
                       ) : (
                         <>

@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext'
 import CategorySelect from './CategorySelect'
 import CurrencyInput from './CurrencyInput'
 import { todayISO, formatCurrency } from '../utils/format'
-import { CreditCard, Wallet, PiggyBank, AlertCircle } from 'lucide-react'
+import { addToQueue } from '../utils/offlineCache'
+import { CreditCard, Wallet, PiggyBank, AlertCircle, WifiOff } from 'lucide-react'
 
 function calcBillMonth(purchaseDate, closingDay, installmentIndex) {
   const d = new Date(purchaseDate + 'T12:00:00')
@@ -38,6 +39,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
   const [cards, setCards]               = useState([])
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState('')
+  const [cardUsed, setCardUsed]         = useState(0)
   const pendingCatId = useRef(null)
 
   const isTransfer  = mainType === 'transfer' || mainType === 'transfer_out'
@@ -48,6 +50,21 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
     supabase.from('credit_cards').select('*').eq('user_id', user.id).order('name')
       .then(({ data }) => setCards(data ?? []))
   }, [user.id])
+
+  useEffect(() => {
+    if (!selectedCard) { setCardUsed(0); return }
+    supabase
+      .from('transactions')
+      .select('amount')
+      .eq('user_id', user.id)
+      .eq('card_id', selectedCard)
+      .eq('type', 'credit_expense')
+      .eq('bill_paid', false)
+      .then(({ data }) => {
+        const used = (data ?? []).reduce((s, t) => s + Number(t.amount), 0)
+        setCardUsed(used)
+      })
+  }, [selectedCard, user.id])
 
   useEffect(() => {
     const catType = mainType === 'income' ? 'income' : 'expense'
@@ -111,6 +128,19 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
     if (!amount || amount <= 0) return setError('Informe um valor válido.')
     if (!description.trim()) return setError('Informe uma descrição.')
     if (payMethod === 'credit' && !selectedCard) return setError('Selecione um cartão.')
+    if (payMethod === 'credit' && selectedCard) {
+      const card  = cards.find(c => c.id === selectedCard)
+      const limit = Number(card?.credit_limit) || 0
+      if (limit > 0) {
+        const editingAmt = initial?.id ? Number(initial.amount ?? 0) : 0
+        const available  = limit - cardUsed + editingAmt
+        if (amount > available) {
+          return setError(
+            `Limite insuficiente. Disponível: ${formatCurrency(available)}`
+          )
+        }
+      }
+    }
     setLoading(true)
 
     const type     = resolveType()
@@ -152,6 +182,12 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
           bill_month:         calcBillMonth(date, card.closing_day, i),
           bill_paid:          false,
         }))
+        if (!navigator.onLine) {
+          rows.forEach(r => addToQueue(r))
+          setLoading(false)
+          onSuccess()
+          return
+        }
         const { error: err } = await supabase.from('transactions').insert(rows)
         setLoading(false)
         if (err) return setError(err.message)
@@ -167,6 +203,12 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
         payment_method: isTransfer ? 'pix' : payMethod || 'pix',
         wallet:         isTransfer ? null  : wallet,
       }
+      if (!initial?.id && !navigator.onLine) {
+        addToQueue(row)
+        setLoading(false)
+        onSuccess()
+        return
+      }
       const { error: err } = initial?.id
         ? await supabase.from('transactions').update(row).eq('id', initial.id)
         : await supabase.from('transactions').insert(row)
@@ -179,6 +221,10 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
   const installAmt = installments > 1 && amount > 0
     ? formatCurrency(Math.round(amount / installments * 100) / 100)
     : null
+
+  const selectedCardObj    = cards.find(c => c.id === selectedCard)
+  const selectedCardLimit  = Number(selectedCardObj?.credit_limit) || 0
+  const cardLimitExceeded  = payMethod === 'credit' && selectedCard && selectedCardLimit > 0 && cardUsed >= selectedCardLimit
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -242,6 +288,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
                   Nenhum cartão cadastrado. Adicione em Configurações.
                 </p>
               ) : (
+                <>
                 <div className="grid grid-cols-2 gap-2">
                   {cards.map(card => (
                     <button key={card.id} type="button" onClick={() => setSelectedCard(card.id)}
@@ -253,8 +300,35 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
                     </button>
                   ))}
                 </div>
+                {(() => {
+                  if (!selectedCard) return null
+                  const card  = cards.find(c => c.id === selectedCard)
+                  const limit = Number(card?.credit_limit) || 0
+                  if (!limit) return null
+                  const available = limit - cardUsed
+                  const pct       = Math.min((cardUsed / limit) * 100, 100)
+                  const barColor  = pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                  return (
+                    <div className="mt-1 px-0.5">
+                      <div className="flex justify-between text-xs mb-1 text-gray-500">
+                        <span>Disponível: <span className={`font-semibold ${available <= 0 ? 'text-rose-600' : 'text-gray-700'}`}>{formatCurrency(Math.max(available, 0))}</span></span>
+                        <span className="text-gray-400">Limite: {formatCurrency(limit)}</span>
+                      </div>
+                      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  )
+                })()}
+                {cardLimitExceeded && (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 mt-1">
+                    <AlertCircle size={15} className="text-amber-500 flex-shrink-0" />
+                    <p className="text-xs text-amber-700 font-medium">Limite esgotado. Não há crédito disponível neste cartão.</p>
+                  </div>
+                )}
+                </>
               )}
-              <div>
+              <div className={cardLimitExceeded ? 'opacity-40 pointer-events-none select-none' : ''}>
                 <p className="text-xs font-medium text-gray-500 mb-1.5">Parcelas</p>
                 <div className="grid grid-cols-6 gap-1">
                   {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
@@ -275,46 +349,54 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
       {/* Campos de detalhe */}
       {showDetails && (
         <>
-          <div>
-            <CurrencyInput label="Valor (R$)" value={amount} onChange={setAmount} autoFocus />
-            {payMethod === 'credit' && installAmt && (
-              <p className="text-xs text-gray-500 mt-1">{installments}x de {installAmt}</p>
+          <div className={`space-y-4 ${cardLimitExceeded ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+            <div>
+              <CurrencyInput label="Valor (R$)" value={amount} onChange={setAmount} autoFocus />
+              {payMethod === 'credit' && installAmt && (
+                <p className="text-xs text-gray-500 mt-1">{installments}x de {installAmt}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+              <input type="text" placeholder="Ex: Supermercado, Salário..."
+                value={description} onChange={e => setDescription(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                className="w-full max-w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+            </div>
+
+            {isPayFlow && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
+                <CategorySelect value={categoryId} onChange={setCategoryId} categories={categories} />
+              </div>
+            )}
+
+            {!navigator.onLine && !error && (
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3">
+                <WifiOff size={15} className="text-amber-500 flex-shrink-0" />
+                <p className="text-xs font-medium text-amber-700">Sem conexão — a transação será salva e enviada quando voltar a internet.</p>
+              </div>
+            )}
+          {error && (
+              <div className="flex items-center gap-2.5 bg-rose-50 border border-rose-200 rounded-xl px-3.5 py-3">
+                <AlertCircle size={18} className="text-rose-600 flex-shrink-0" />
+                <p className="text-sm font-medium text-rose-700">{error}</p>
+              </div>
             )}
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
-            <input type="text" placeholder="Ex: Supermercado, Salário..."
-              value={description} onChange={e => setDescription(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Data</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              className="w-full max-w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-          </div>
-
-          {isPayFlow && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-              <CategorySelect value={categoryId} onChange={setCategoryId} categories={categories} />
-            </div>
-          )}
-
-          {error && (
-            <div className="flex items-center gap-2.5 bg-rose-50 border border-rose-200 rounded-xl px-3.5 py-3">
-              <AlertCircle size={18} className="text-rose-600 flex-shrink-0" />
-              <p className="text-sm font-medium text-rose-700">{error}</p>
-            </div>
-          )}
 
           <div className="flex gap-2 pt-1">
             <button type="button" onClick={onCancel}
               className="flex-1 py-3 rounded-xl border border-gray-300 text-gray-700 font-medium">
               Cancelar
             </button>
-            <button type="submit" disabled={loading}
+            <button type="submit" disabled={loading || cardLimitExceeded}
               className="flex-1 py-3 rounded-xl bg-yellow-600 text-white font-medium disabled:opacity-60">
               {loading ? 'Salvando...' : initial?.id ? 'Atualizar' : 'Adicionar'}
             </button>

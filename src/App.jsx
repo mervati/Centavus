@@ -1,8 +1,10 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, useCallback, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import SplashScreen from './components/SplashScreen'
+import { supabase } from './lib/supabase'
+import { getQueue, removeFromQueue } from './utils/offlineCache'
 
 const Auth        = lazy(() => import('./pages/Auth'))
 const Dashboard   = lazy(() => import('./pages/Dashboard'))
@@ -34,6 +36,24 @@ function AppRoutes() {
     const id = setTimeout(() => setMinDone(true), 1600)
     return () => clearTimeout(id)
   }, [])
+
+  const flushQueue = useCallback(async () => {
+    if (!user) return
+    const queue = getQueue()
+    if (!queue.length) return
+    for (const item of queue) {
+      const { _queueId, ...tx } = item
+      const { error } = await supabase.from('transactions').insert(tx)
+      if (!error) removeFromQueue(_queueId)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    window.addEventListener('online', flushQueue)
+    if (navigator.onLine) flushQueue()
+    return () => window.removeEventListener('online', flushQueue)
+  }, [user, flushQueue])
 
   if (loading || !minDone) return <SplashScreen />
 

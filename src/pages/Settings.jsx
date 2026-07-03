@@ -217,47 +217,59 @@ export default function Settings() {
     setTimeout(() => setYieldSaved(false), 3000)
   }
 
+  const initials = (user.email ?? '?')[0].toUpperCase()
+
   return (
     <Layout title="Configurações">
-      <div className="px-4 py-4 space-y-4">
+      <div className="px-4 py-5 space-y-6">
 
-        {/* Conta */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <p className="text-xs text-gray-500 mb-1">Conta</p>
-          <p className="font-medium text-gray-900">{user.email}</p>
-        </div>
-
-        {/* Tema */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-gray-700' : 'bg-yellow-100'}`}>
-                {dark ? <Moon size={20} className="text-yellow-400" /> : <Sun size={20} className="text-yellow-600" />}
-              </div>
-              <div>
-                <p className="font-semibold text-gray-900 text-sm">Tema</p>
-                <p className="text-xs text-gray-500">{dark ? 'Modo escuro ativo' : 'Modo claro ativo'}</p>
-              </div>
-            </div>
-            <button
-              onClick={toggleDark}
-              className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${dark ? 'bg-yellow-600' : 'bg-gray-300'}`}
-            >
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${dark ? 'left-7' : 'left-1'}`} />
-            </button>
+        {/* Perfil */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-4">
+          <div className="w-12 h-12 rounded-full bg-yellow-600 flex items-center justify-center flex-shrink-0">
+            <span className="text-white font-bold text-lg leading-none">{initials}</span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-gray-900 text-sm truncate">{user.email}</p>
+            <p className="text-xs text-gray-400 mt-0.5">Conta pessoal</p>
           </div>
         </div>
 
-        {/* Telegram */}
+        {/* Aparência */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Aparência</p>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100">
+            <div className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${dark ? 'bg-gray-700' : 'bg-yellow-100'}`}>
+                  {dark ? <Moon size={18} className="text-yellow-400" /> : <Sun size={18} className="text-yellow-600" />}
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 text-sm">Tema escuro</p>
+                  <p className="text-xs text-gray-400">{dark ? 'Ativado' : 'Desativado'}</p>
+                </div>
+              </div>
+              <button
+                onClick={toggleDark}
+                className={`relative w-12 h-6 rounded-full transition-colors flex-shrink-0 ${dark ? 'bg-yellow-600' : 'bg-gray-300'}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${dark ? 'left-7' : 'left-1'}`} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Notificações */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Notificações</p>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${telegramChatId ? 'bg-blue-100' : 'bg-gray-100'}`}>
-              <Send size={20} className={telegramChatId ? 'text-blue-500' : 'text-gray-400'} />
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${telegramChatId ? 'bg-blue-100' : 'bg-gray-100'}`}>
+              <Send size={18} className={telegramChatId ? 'text-blue-500' : 'text-gray-400'} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-900 text-sm">Notificações Telegram</p>
-              <p className="text-xs text-gray-500">
-                {telegramChatId ? 'Conectado — alertas de contas ativos' : 'Receba alertas sobre contas a vencer'}
+              <p className="font-medium text-gray-900 text-sm">Telegram</p>
+              <p className="text-xs text-gray-400">
+                {telegramChatId ? 'Conectado — alertas ativos' : 'Receba alertas sobre contas'}
               </p>
             </div>
             {telegramChatId && (
@@ -272,7 +284,7 @@ export default function Settings() {
 
               {/* 1º Alerta */}
               <div>
-                <p className="text-xs font-semibold text-gray-600 mb-2">1º Alerta</p>
+                <p className="text-xs font-semibold text-gray-500 mb-2">1º Alerta</p>
                 <div className="flex gap-1.5 flex-wrap">
                   {[{v:0,l:'No dia'},{v:1,l:'1 dia'},{v:2,l:'2 dias'},{v:3,l:'3 dias'},{v:5,l:'5 dias'},{v:7,l:'7 dias'}].map(opt => (
                     <button key={opt.v} onClick={() => saveTelegramSettings({ days1: opt.v })}
@@ -290,7 +302,7 @@ export default function Settings() {
               {/* 2º Alerta */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-gray-600">2º Alerta</p>
+                  <p className="text-xs font-semibold text-gray-500">2º Alerta</p>
                   <button
                     onClick={() => saveTelegramSettings({ days2: telegramDays2 !== null ? null : 3 })}
                     className={`relative w-9 h-5 rounded-full transition-colors ${telegramDays2 !== null ? 'bg-blue-500' : 'bg-gray-300'}`}>
@@ -315,7 +327,7 @@ export default function Settings() {
 
               {/* Horário */}
               <div>
-                <p className="text-xs font-semibold text-gray-600 mb-2">Horário (BRT)</p>
+                <p className="text-xs font-semibold text-gray-500 mb-2">Horário (BRT)</p>
                 <div className="flex gap-1.5 flex-wrap">
                   {[6,7,8,9,10,12,18,20].map(h => (
                     <button key={h} onClick={() => saveTelegramSettings({ hour: h })}
@@ -364,16 +376,22 @@ export default function Settings() {
             </div>
           )}
         </div>
+        </div>
+
+        {/* Financeiro */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Financeiro</p>
+          <div className="space-y-3">
 
         {/* Rendimento CDI */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center">
-              <TrendingUp size={20} className="text-yellow-600" />
+            <div className="w-9 h-9 bg-yellow-100 rounded-xl flex items-center justify-center">
+              <TrendingUp size={18} className="text-yellow-600" />
             </div>
             <div>
-              <p className="font-semibold text-gray-900 text-sm">Rendimento CDI</p>
-              <p className="text-xs text-gray-500">Selecione o tipo da sua conta</p>
+              <p className="font-medium text-gray-900 text-sm">Rendimento CDI</p>
+              <p className="text-xs text-gray-400">Tipo da sua conta de banco</p>
             </div>
           </div>
           <div className="space-y-2">
@@ -392,7 +410,7 @@ export default function Settings() {
                   <p className={`text-sm font-medium ${yieldType === opt.value ? 'text-yellow-700' : 'text-gray-800'}`}>
                     {opt.label}
                   </p>
-                  <p className="text-xs text-gray-500">{opt.desc}</p>
+                  <p className="text-xs text-gray-400">{opt.desc}</p>
                 </div>
                 {yieldType === opt.value && (
                   <div className="w-5 h-5 rounded-full bg-yellow-500 flex items-center justify-center flex-shrink-0">
@@ -413,17 +431,17 @@ export default function Settings() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                <CreditCard size={20} className="text-purple-600" />
+              <div className="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center">
+                <CreditCard size={18} className="text-purple-600" />
               </div>
               <div>
-                <p className="font-semibold text-gray-900 text-sm">Cartões de Crédito</p>
-                <p className="text-xs text-gray-500">{cards.length} cartão{cards.length !== 1 ? 'ões' : ''} cadastrado{cards.length !== 1 ? 's' : ''}</p>
+                <p className="font-medium text-gray-900 text-sm">Cartões de Crédito</p>
+                <p className="text-xs text-gray-400">{cards.length === 0 ? 'Nenhum cadastrado' : `${cards.length} cartão${cards.length !== 1 ? 'ões' : ''}`}</p>
               </div>
             </div>
             <button onClick={() => setShowAddCard(v => !v)}
-              className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
-              <Plus size={16} />
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${showAddCard ? 'bg-gray-200 text-gray-600' : 'bg-purple-100 text-purple-600'}`}>
+              {showAddCard ? <X size={15} /> : <Plus size={15} />}
             </button>
           </div>
 
@@ -481,7 +499,7 @@ export default function Settings() {
                     <div className="w-3 h-3 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: card.color }} />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{card.name}</p>
-                      <p className="text-xs text-gray-500">Fecha dia {card.closing_day}</p>
+                      <p className="text-xs text-gray-400">Fecha dia {card.closing_day}</p>
                       {limit > 0 && (
                         <div className="mt-1.5">
                           <div className="flex justify-between text-xs mb-1">
@@ -554,20 +572,25 @@ export default function Settings() {
           )}
         </div>
 
-        {/* Rebalanço */}
+          </div>{/* fim space-y-3 Financeiro */}
+        </div>{/* fim section Financeiro */}
+
+        {/* Avançado */}
         {!loading && (
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Avançado</p>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <button
               onClick={() => setShowRebalance(v => !v)}
               className="w-full p-4 flex items-center justify-between"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-yellow-100 rounded-xl flex items-center justify-center">
-                  <RefreshCw size={18} className="text-yellow-600" />
+                <div className="w-9 h-9 bg-yellow-100 rounded-xl flex items-center justify-center">
+                  <RefreshCw size={17} className="text-yellow-600" />
                 </div>
                 <div className="text-left">
-                  <p className="font-semibold text-gray-900 text-sm">Rebalanço</p>
-                  <p className="text-xs text-gray-500">Corrigir o saldo atual</p>
+                  <p className="font-medium text-gray-900 text-sm">Rebalanço</p>
+                  <p className="text-xs text-gray-400">Corrigir o saldo atual</p>
                 </div>
               </div>
               {showRebalance
@@ -577,16 +600,15 @@ export default function Settings() {
 
             {showRebalance && (
               <form onSubmit={handleRebalance} className="px-4 pb-4 space-y-4 border-t border-gray-100">
-                {/* Valores atuais */}
-                <div className="mt-4 grid grid-cols-2 gap-3 bg-gray-50 rounded-xl p-3">
+                  <div className="mt-4 grid grid-cols-2 gap-3 bg-gray-50 rounded-xl p-3">
                   <div className="text-center">
-                    <p className="text-xs text-gray-500 mb-0.5">Saldo Banco atual</p>
+                    <p className="text-xs text-gray-400 mb-0.5">Banco atual</p>
                     <p className={`font-bold text-sm ${balance < 0 ? 'text-rose-600' : 'text-gray-900'}`}>
                       {formatCurrency(balance)}
                     </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-gray-500 mb-0.5">Cofrinho atual</p>
+                    <p className="text-xs text-gray-400 mb-0.5">Cofrinho atual</p>
                     <p className="font-bold text-sm text-blue-600">{formatCurrency(savings)}</p>
                   </div>
                 </div>
@@ -630,21 +652,26 @@ export default function Settings() {
               </form>
             )}
           </div>
+
+          {rebalanceSuccess && (
+            <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center">
+              <p className="text-emerald-700 text-sm font-medium">Rebalanço aplicado! Saldo atualizado.</p>
+            </div>
+          )}
+        </div>
         )}
 
-        {/* Feedback de sucesso */}
-        {rebalanceSuccess && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center">
-            <p className="text-emerald-700 text-sm font-medium">Rebalanço aplicado! Saldo atualizado.</p>
-          </div>
-        )}
+        {/* Conta */}
+        <div>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Conta</p>
+          <button
+            onClick={signOut}
+            className="w-full py-3 rounded-2xl bg-white shadow-sm border border-rose-100 text-rose-500 font-medium text-sm"
+          >
+            Sair da conta
+          </button>
+        </div>
 
-        <button
-          onClick={signOut}
-          className="w-full py-3 rounded-2xl border border-rose-200 text-rose-600 font-medium"
-        >
-          Sair da conta
-        </button>
       </div>
     </Layout>
   )

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
@@ -27,6 +27,10 @@ export default function Bills() {
   const [payingFatura, setPayingFatura] = useState(null)
   const [editingFatura, setEditingFatura] = useState(null)
   const [editDueDate, setEditDueDate]   = useState('')
+  const [cardUnpaid, setCardUnpaid]     = useState({})
+  const [cardLimits, setCardLimits]     = useState({})
+  const [selectedMonth, setSelectedMonth] = useState('')
+  const pillsRef = useRef(null)
 
   const loadBills = useCallback(async () => {
     setLoading(true)
@@ -42,29 +46,45 @@ export default function Bills() {
   const loadFaturas = useCallback(async () => {
     const { data } = await supabase
       .from('transactions')
-      .select('*, credit_cards(id, name, color, closing_day)')
+      .select('*, credit_cards(id, name, color, closing_day, credit_limit)')
       .eq('user_id', user.id)
       .eq('type', 'credit_expense')
       .order('bill_month')
       .order('date')
 
-    if (!data?.length) { setFaturas([]); return }
+    if (!data?.length) { setFaturas([]); setCardUnpaid({}); setCardLimits({}); return }
 
     const map = {}
+    const unpaid = {}
+    const limits = {}
     data.forEach(tx => {
-      const key = `${tx.card_id}__${tx.bill_month}`
+      const bm = (tx.bill_month ?? '').slice(0, 7)
+      const key = `${tx.card_id}__${bm}`
       if (!map[key]) map[key] = {
         key, card: tx.credit_cards, cardId: tx.card_id,
-        billMonth: tx.bill_month, items: [], total: 0, allPaid: true,
+        billMonth: bm, items: [], total: 0, allPaid: true,
         dueDate: null,
       }
       map[key].items.push(tx)
       map[key].total += Number(tx.amount)
-      if (!tx.bill_paid) map[key].allPaid = false
+      if (!tx.bill_paid) {
+        map[key].allPaid = false
+        unpaid[tx.card_id] = (unpaid[tx.card_id] || 0) + Number(tx.amount)
+      }
       if (tx.bill_due_date) map[key].dueDate = tx.bill_due_date
+      if (tx.credit_cards?.credit_limit) limits[tx.card_id] = Number(tx.credit_cards.credit_limit)
     })
 
-    setFaturas(Object.values(map).sort((a, b) => a.billMonth.localeCompare(b.billMonth)))
+    setCardUnpaid(unpaid)
+    setCardLimits(limits)
+    const sorted = Object.values(map).sort((a, b) => a.billMonth.localeCompare(b.billMonth))
+    setFaturas(sorted)
+    const currentYM = new Date().toISOString().slice(0, 7)
+    const fMonths = [...new Set(sorted.map(f => f.billMonth))].sort()
+    setSelectedMonth(prev => {
+      if (prev && fMonths.includes(prev)) return prev
+      return fMonths.includes(currentYM) ? currentYM : (fMonths[fMonths.length - 1] ?? currentYM)
+    })
   }, [user.id])
 
   useEffect(() => { loadBills(); loadFaturas() }, [loadBills, loadFaturas])
@@ -168,6 +188,30 @@ export default function Bills() {
   const totalFaturas    = openFaturasByCard.reduce((a, f) => a + f.total, 0)
   // totalFaturasAll = soma de todos os meses em aberto (para o banner da aba Faturas)
   const totalFaturasAll = faturas.filter(f => !f.allPaid).reduce((a, f) => a + f.total, 0)
+
+  useEffect(() => {
+    if (!pillsRef.current || !selectedMonth) return
+    const active = pillsRef.current.querySelector('[data-active="true"]')
+    if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+  }, [selectedMonth, tab])
+
+  const availableMonths = useMemo(() => {
+    const currentYM = new Date().toISOString().slice(0, 7)
+    const fMonths = [...new Set(faturas.map(f => f.billMonth))].sort()
+    const latest = fMonths.length > 0 && fMonths[fMonths.length - 1] > currentYM
+      ? fMonths[fMonths.length - 1]
+      : currentYM
+    const [ly, lm] = latest.split('-').map(Number)
+    return Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(ly, lm - 1 - (11 - i), 1)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    })
+  }, [faturas])
+
+  const visibleFaturas = useMemo(
+    () => selectedMonth ? faturas.filter(f => f.billMonth === selectedMonth) : faturas,
+    [faturas, selectedMonth]
+  )
 
   function getBadge(bill) {
     if (bill.paid) return { label: 'Paga', cls: 'bg-emerald-100 text-emerald-700' }
@@ -305,23 +349,44 @@ export default function Bills() {
                       Faturas de crédito
                     </p>
                   )}
-                  {openFaturasByCard.map(fc => (
-                    <div key={fc.cardId} className="bg-white rounded-2xl p-3.5 shadow-sm border border-purple-100 flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: (fc.card?.color ?? '#9333ea') + '22' }}>
-                        <CreditCard size={15} style={{ color: fc.card?.color ?? '#9333ea' }} />
+                  {openFaturasByCard.map(fc => {
+                    const limit    = cardLimits[fc.cardId] || 0
+                    const used     = cardUnpaid[fc.cardId] || 0
+                    const pct      = limit > 0 ? Math.min((used / limit) * 100, 100) : 0
+                    const barColor = pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                    return (
+                      <div key={fc.cardId} className="bg-white rounded-2xl p-3.5 shadow-sm border border-purple-100">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: (fc.card?.color ?? '#9333ea') + '22' }}>
+                            <CreditCard size={15} style={{ color: fc.card?.color ?? '#9333ea' }} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-gray-900">{fc.card?.name}</p>
+                            <p className="text-xs text-gray-500">{formatBillMonth(fc.billMonth)}</p>
+                          </div>
+                          <p className="font-semibold text-sm text-purple-600 flex-shrink-0">
+                            {formatCurrency(fc.total)}
+                          </p>
+                        </div>
+                        {limit > 0 && (
+                          <div className="mt-2">
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="text-gray-500">
+                                <span className={pct >= 90 ? 'text-rose-600 font-semibold' : pct >= 70 ? 'text-amber-600 font-semibold' : 'text-gray-700'}>
+                                  {formatCurrency(used)}
+                                </span>{' '}usado
+                              </span>
+                              <span className="text-gray-400">{formatCurrency(limit - used)} disponível</span>
+                            </div>
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm text-gray-900">{fc.card?.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {formatBillMonth(fc.billMonth)}
-                        </p>
-                      </div>
-                      <p className="font-semibold text-sm text-purple-600 flex-shrink-0">
-                        {formatCurrency(fc.total)}
-                      </p>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </>
               )}
             </div>
@@ -353,8 +418,47 @@ export default function Bills() {
               <p className="text-xs mt-1">Adicione uma despesa no crédito para ver aqui</p>
             </div>
           ) : (
-            <div className="px-4 space-y-3 pb-4 mt-3">
-              {faturas.map(fatura => (
+            <>
+              {/* Seletor de meses */}
+              {availableMonths.length > 0 && (
+                <div ref={pillsRef} className="px-4 mt-3 flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
+                  {availableMonths.map(ym => (
+                    <button key={ym} data-active={selectedMonth === ym ? 'true' : 'false'}
+                      onClick={() => setSelectedMonth(ym)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all flex flex-col items-center leading-tight ${
+                        selectedMonth === ym
+                          ? 'bg-yellow-600 text-white'
+                          : 'bg-white border border-gray-200 text-gray-600 hover:border-yellow-400'
+                      }`}>
+                      <span>{(() => { const s = new Date(ym + '-15').toLocaleDateString('pt-BR', { month: 'short' }).replace('.', ''); return s.charAt(0).toUpperCase() + s.slice(1) })()}</span>
+                      <span className="text-xs opacity-80">{ym.slice(0, 4)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+            <div className="px-4 pb-4 mt-3">
+              {visibleFaturas.length === 0 && (
+                <div className="flex flex-col items-center text-center py-6">
+                  <p className="text-sm font-semibold text-gray-700 mb-3 capitalize">
+                    {formatBillMonth(selectedMonth)}
+                  </p>
+                  <div className="w-64 h-64 flex items-center justify-center overflow-hidden">
+                    <img
+                      src="/empty-faturas.png"
+                      alt="Sem faturas"
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <p className="text-base font-bold text-gray-800 mt-2">Nenhuma fatura encontrada</p>
+                  <p className="text-xs text-gray-400 mt-1 max-w-[220px]">
+                    Para {formatBillMonth(selectedMonth)} você não possui faturas ou despesas registradas.
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className="px-4 space-y-3 pb-4">
+              {visibleFaturas.map(fatura => (
                 <div key={fatura.key} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                   {/* Header */}
                   <div className="flex items-center justify-between p-3.5 border-b border-gray-50">
@@ -376,7 +480,8 @@ export default function Bills() {
                   </div>
 
                   {/* Total + vencimento */}
-                  <div className="px-3.5 py-3 flex items-center justify-between">
+                  <div className="px-3.5 py-3">
+                    <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs text-gray-500 mb-0.5">Total da fatura</p>
                       <p className="font-bold text-gray-900 text-lg">{formatCurrency(fatura.total)}</p>
@@ -403,6 +508,29 @@ export default function Bills() {
                         </>
                       )}
                     </div>
+                    </div>
+                    {(() => {
+                      const limit    = cardLimits[fatura.cardId] || 0
+                      const used     = cardUnpaid[fatura.cardId] || 0
+                      const pct      = limit > 0 ? Math.min((used / limit) * 100, 100) : 0
+                      const barColor = pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                      if (!limit) return null
+                      return (
+                        <div className="mt-2">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-gray-500">
+                              <span className={pct >= 90 ? 'text-rose-600 font-semibold' : pct >= 70 ? 'text-amber-600 font-semibold' : 'text-gray-700'}>
+                                {formatCurrency(used)}
+                              </span>{' '}usado
+                            </span>
+                            <span className="text-gray-400">{formatCurrency(limit - used)} disponível</span>
+                          </div>
+                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                          </div>
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   {/* Pay button */}
@@ -431,6 +559,7 @@ export default function Bills() {
                 </div>
               ))}
             </div>
+            </>
           )}
         </>
       )}

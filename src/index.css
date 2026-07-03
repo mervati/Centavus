@@ -8,20 +8,17 @@
     -webkit-tap-highlight-color: transparent;
     overflow-y: auto;
     overscroll-behavior-x: none;
-    touch-action: pan-y;
     width: 100%;
   }
   body {
     @apply bg-gray-50 text-gray-900;
     overscroll-behavior: none;
     overflow-x: clip;
-    touch-action: pan-y;
     width: 100%;
     position: relative;
   }
   #root {
     overflow-x: clip;
-    touch-action: pan-y;
     width: 100%;
     min-height: 100dvh;
   }

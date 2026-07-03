@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun, Check, TrendingUp, CreditCard, Trash2, Plus, Send, CheckCircle2, ExternalLink } from 'lucide-react'
+import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun, Check, TrendingUp, CreditCard, Trash2, Plus, Pencil, X, Send, CheckCircle2, ExternalLink } from 'lucide-react'
 import { formatCurrency, todayISO } from '../utils/format'
 import { useTheme } from '../contexts/ThemeContext'
 import CurrencyInput from '../components/CurrencyInput'
@@ -40,6 +40,12 @@ export default function Settings() {
   const [newCardLimit, setNewCardLimit] = useState(0)
   const [addingCard, setAddingCard] = useState(false)
   const [cardUsage, setCardUsage] = useState({})
+  const [editingCardId, setEditingCardId] = useState(null)
+  const [editName, setEditName]   = useState('')
+  const [editDay, setEditDay]     = useState('')
+  const [editColor, setEditColor] = useState('#6366f1')
+  const [editLimit, setEditLimit] = useState(0)
+  const [updatingCard, setUpdatingCard] = useState(false)
   const [telegramChatId, setTelegramChatId]   = useState(null)
   const [telegramDays1, setTelegramDays1]     = useState(1)
   const [telegramDays2, setTelegramDays2]     = useState(null)
@@ -148,6 +154,30 @@ export default function Settings() {
   async function handleDeleteCard(id) {
     if (!confirm('Remover este cartão? As transações vinculadas serão desvinculadas.')) return
     await supabase.from('credit_cards').delete().eq('id', id)
+    loadData()
+  }
+
+  function startEditCard(card) {
+    setEditingCardId(card.id)
+    setEditName(card.name)
+    setEditDay(String(card.closing_day))
+    setEditColor(card.color)
+    setEditLimit(Number(card.credit_limit) || 0)
+  }
+
+  async function handleUpdateCard(e) {
+    e.preventDefault()
+    const day = Number(editDay)
+    if (!editName.trim() || !editDay || day < 1 || day > 31) return
+    setUpdatingCard(true)
+    await supabase.from('credit_cards').update({
+      name:         editName.trim(),
+      closing_day:  day,
+      color:        editColor,
+      credit_limit: editLimit > 0 ? editLimit : null,
+    }).eq('id', editingCardId)
+    setEditingCardId(null)
+    setUpdatingCard(false)
     loadData()
   }
 
@@ -398,12 +428,54 @@ export default function Settings() {
           </div>
 
           {cards.length > 0 && (
-            <div className="px-4 pb-3 space-y-2 border-t border-gray-100 pt-3">
+            <div className="px-4 pb-3 space-y-3 border-t border-gray-100 pt-3">
               {cards.map(card => {
                 const used  = cardUsage[card.id] || 0
                 const limit = Number(card.credit_limit) || 0
                 const pct   = limit > 0 ? Math.min((used / limit) * 100, 100) : 0
                 const barColor = pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+
+                if (editingCardId === card.id) {
+                  return (
+                    <form key={card.id} onSubmit={handleUpdateCard} className="bg-gray-50 rounded-2xl p-3 space-y-3 border border-gray-200">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Nome do cartão</label>
+                        <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Dia de fechamento</label>
+                        <input type="number" min="1" max="31" value={editDay} onChange={e => setEditDay(e.target.value)}
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Limite do cartão (R$)</label>
+                        <CurrencyInput value={editLimit} onChange={setEditLimit} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-2">Cor</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {CARD_COLORS.map(c => (
+                            <button key={c} type="button" onClick={() => setEditColor(c)}
+                              className={`w-7 h-7 rounded-full transition-transform ${editColor === c ? 'scale-125 ring-2 ring-offset-1 ring-gray-400' : ''}`}
+                              style={{ backgroundColor: c }} />
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={() => setEditingCardId(null)}
+                          className="flex-1 py-2 rounded-xl border border-gray-300 text-gray-600 text-sm font-medium">
+                          Cancelar
+                        </button>
+                        <button type="submit" disabled={updatingCard || !editName.trim() || !editDay}
+                          className="flex-1 py-2 rounded-xl bg-yellow-600 text-white text-sm font-semibold disabled:opacity-60">
+                          {updatingCard ? 'Salvando...' : 'Salvar'}
+                        </button>
+                      </div>
+                    </form>
+                  )
+                }
+
                 return (
                   <div key={card.id} className="flex items-start gap-3">
                     <div className="w-3 h-3 rounded-full flex-shrink-0 mt-1" style={{ backgroundColor: card.color }} />
@@ -430,10 +502,16 @@ export default function Settings() {
                         </div>
                       )}
                     </div>
-                    <button onClick={() => handleDeleteCard(card.id)}
-                      className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-rose-500 flex-shrink-0">
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button onClick={() => startEditCard(card)}
+                        className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-yellow-600">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => handleDeleteCard(card.id)}
+                        className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-rose-500">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 )
               })}

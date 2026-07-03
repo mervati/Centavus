@@ -34,7 +34,6 @@ export default function CurrencyInput({ value = 0, onChange, autoFocus = false, 
         <input
           type="text"
           inputMode="numeric"
-          pattern="[0-9]*"
           autoComplete="off"
           autoFocus={autoFocus}
           value={formatCents(rawCents)}

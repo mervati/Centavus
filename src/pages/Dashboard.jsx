@@ -6,7 +6,8 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import TransactionForm from '../components/TransactionForm'
 import { formatCurrency, formatDate, daysUntil, isOverdue, todayISO } from '../utils/format'
-import { Plus, TrendingUp, TrendingDown, PiggyBank, AlertCircle, LogOut, Settings, ChevronRight } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, PiggyBank, AlertCircle, LogOut, Settings, ChevronRight, Percent, Check } from 'lucide-react'
+import CurrencyInput from '../components/CurrencyInput'
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions'
 
 const DEFAULT_CATEGORIES = [
@@ -38,6 +39,11 @@ export default function Dashboard() {
   const [initSavings, setInitSavings]   = useState('')
   const [setupLoading, setSetupLoading] = useState(false)
   const [loading, setLoading]           = useState(true)
+  const [showYieldModal, setShowYieldModal] = useState(false)
+  const [yieldTarget, setYieldTarget]   = useState('bank')  // 'bank' | 'savings'
+  const [yieldMode, setYieldMode]       = useState('diff')  // 'diff'=só rendimento | 'full'=saldo completo
+  const [yieldAmt, setYieldAmt]         = useState(0)
+  const [yieldLoading, setYieldLoading] = useState(false)
 
   // Valores derivados — recalculam só quando rawTx ou settings mudam
   const balance = useMemo(() => {
@@ -66,11 +72,20 @@ export default function Dashboard() {
     return balance + savings + ((monthIncome - monthExpense) / dayElapsed) * daysRemaining
   }, [rawTx, settings, balance, savings])
 
+  const bankYield = useMemo(() =>
+    rawTx.filter(t => t.type === 'income' && t.description === 'Rendimento')
+         .reduce((a, t) => a + Number(t.amount), 0)
+  , [rawTx])
+
+  const savingsYield = useMemo(() =>
+    rawTx.filter(t => t.type === 'cofrinho_income' && t.description === 'Rendimento')
+         .reduce((a, t) => a + Number(t.amount), 0)
+  , [rawTx])
+
   const loadData = useCallback(async () => {
     const [{ data: s }, { data: tx }, { data: recent }, { data: bills }] = await Promise.all([
       supabase.from('user_settings').select('*').eq('id', user.id).single(),
-      // lean: só amount/type/date para calcular saldo — sem join de categorias
-      supabase.from('transactions').select('amount,type,date').eq('user_id', user.id),
+      supabase.from('transactions').select('amount,type,date,description').eq('user_id', user.id),
       // rico: últimas 5 transações com categorias para exibição
       supabase.from('transactions')
         .select('*, categories(name,icon,color)')
@@ -112,6 +127,25 @@ export default function Dashboard() {
       loadData()
     }
     setSetupLoading(false)
+  }
+
+  async function handleYield() {
+    const currentVal = yieldTarget === 'bank' ? balance : savings
+    const gain = yieldMode === 'diff' ? yieldAmt : yieldAmt - currentVal
+    if (gain <= 0) return
+    setYieldLoading(true)
+    await supabase.from('transactions').insert({
+      user_id:     user.id,
+      amount:      gain,
+      type:        yieldTarget === 'bank' ? 'income' : 'cofrinho_income',
+      description: 'Rendimento',
+      date:        todayISO(),
+      category_id: null,
+    })
+    setShowYieldModal(false)
+    setYieldAmt(0)
+    setYieldLoading(false)
+    loadData()
   }
 
   const txTypeStyle = t => ({
@@ -181,6 +215,9 @@ export default function Dashboard() {
             <div>
               <p className="text-xs text-gray-500 font-medium">Saldo Banco</p>
               <p className={`text-lg font-bold ${balance < 0 ? 'text-rose-600' : 'text-yellow-700'}`}>{formatCurrency(balance)}</p>
+              {bankYield > 0 && (
+                <p className="text-xs text-emerald-600 font-medium mt-0.5">↗ +{formatCurrency(bankYield)} rendimento</p>
+              )}
             </div>
           </div>
         </div>
@@ -195,6 +232,9 @@ export default function Dashboard() {
               <span className="text-xs text-gray-500 font-medium">Cofrinho</span>
             </div>
             <p className="text-lg font-bold text-blue-700">{formatCurrency(savings)}</p>
+            {savingsYield > 0 && (
+              <p className="text-xs text-emerald-600 font-medium mt-0.5">↗ +{formatCurrency(savingsYield)}</p>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
@@ -210,13 +250,20 @@ export default function Dashboard() {
       </div>
 
       {/* Add transaction button */}
-      <div className="px-4 mb-6">
+      <div className="px-4 mb-6 flex gap-3">
         <button
           onClick={() => setShowTxModal(true)}
-          className="w-full py-3.5 rounded-2xl bg-yellow-600 text-white font-semibold flex items-center justify-center gap-2 shadow-sm"
+          className="flex-1 py-3.5 rounded-2xl bg-yellow-600 text-white font-semibold flex items-center justify-center gap-2 shadow-sm"
         >
           <Plus size={20} />
           Nova transação
+        </button>
+        <button
+          onClick={() => { setShowYieldModal(true); setYieldAmt(0); setYieldTarget('bank'); setYieldMode('diff') }}
+          className="py-3.5 px-4 rounded-2xl border-2 border-yellow-600 text-yellow-700 font-semibold flex items-center justify-center gap-2"
+        >
+          <Percent size={18} />
+          Rendimento
         </button>
       </div>
 
@@ -275,6 +322,77 @@ export default function Dashboard() {
           </div>
         </section>
       )}
+
+      {/* Rendimento Modal */}
+      <Modal open={showYieldModal} onClose={() => setShowYieldModal(false)} title="Registrar rendimento">
+        {(() => {
+          const currentVal = yieldTarget === 'bank' ? balance : savings
+          const gain = yieldMode === 'diff' ? yieldAmt : yieldAmt - currentVal
+          const canConfirm = gain > 0
+
+          return (
+            <div className="space-y-5">
+              {/* Destino */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Destino</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[{ key: 'bank', label: 'Banco', cur: balance }, { key: 'savings', label: 'Cofrinho', cur: savings }].map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => { setYieldTarget(opt.key); setYieldAmt(0) }}
+                      className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-colors ${yieldTarget === opt.key ? 'border-yellow-500 bg-yellow-50 text-yellow-700' : 'border-gray-200 text-gray-500'}`}
+                    >
+                      {opt.label}
+                      <span className="block text-xs font-normal mt-0.5 opacity-70">{formatCurrency(opt.cur)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Modo de entrada */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Inserir como</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[{ key: 'diff', label: 'Valor do rendimento' }, { key: 'full', label: 'Saldo novo completo' }].map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => { setYieldMode(opt.key); setYieldAmt(0) }}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-semibold border-2 transition-colors ${yieldMode === opt.key ? 'border-yellow-500 bg-yellow-50 text-yellow-700' : 'border-gray-200 text-gray-500'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Input */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                  {yieldMode === 'diff' ? 'Valor do rendimento' : 'Novo saldo total'}
+                </p>
+                <CurrencyInput value={yieldAmt} onChange={setYieldAmt} autoFocus />
+                {yieldMode === 'full' && yieldAmt > 0 && (
+                  <p className={`text-xs mt-2 font-medium ${canConfirm ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {canConfirm
+                      ? `Rendimento calculado: +${formatCurrency(gain)}`
+                      : `O valor deve ser maior que o saldo atual (${formatCurrency(currentVal)})`}
+                  </p>
+                )}
+              </div>
+
+              {/* Confirmar */}
+              <button
+                onClick={handleYield}
+                disabled={yieldLoading || !canConfirm}
+                className="w-full py-3.5 rounded-2xl bg-yellow-600 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+              >
+                <Check size={18} />
+                {yieldLoading ? 'Salvando...' : `Confirmar +${formatCurrency(canConfirm ? gain : 0)}`}
+              </button>
+            </div>
+          )
+        })()}
+      </Modal>
 
       {/* Setup Modal */}
       <Modal open={showSetupModal} onClose={() => {}} title="Configuração inicial">

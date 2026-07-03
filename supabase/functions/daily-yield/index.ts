@@ -54,9 +54,35 @@ Deno.serve(async () => {
       if (u.last_yield_update === todayStr) continue
       const pct = YIELD_PCT[u.yield_type]
       if (!pct) continue
-      const dailyRate  = dailyCDI * pct
-      const newBalance = Math.round(Number(u.initial_balance) * (1 + dailyRate) * 100) / 100
-      const newSavings = Math.round(Number(u.savings_initial) * (1 + dailyRate) * 100) / 100
+      const dailyRate = dailyCDI * pct
+
+      // Busca transações para calcular o saldo real atual
+      const { data: txs } = await supabase
+        .from('transactions')
+        .select('amount, type')
+        .eq('user_id', u.id)
+
+      const sum = (type: string) =>
+        (txs ?? []).filter((t: any) => t.type === type).reduce((a: number, t: any) => a + Number(t.amount), 0)
+
+      const income  = sum('income')
+      const expense = sum('expense')
+      const savDep  = sum('savings_deposit')
+      const savWith = sum('savings_withdrawal')
+      const cofInc  = sum('cofrinho_income')
+      const cofExp  = sum('cofrinho_expense')
+
+      // Saldo real = base + todas as transações (igual ao frontend)
+      const actualBalance = Number(u.initial_balance) + income - expense - savDep + savWith
+      const actualSavings = Number(u.savings_initial) + savDep - savWith + cofInc - cofExp
+
+      // Ganho calculado sobre o saldo real, somado ao base (não multiplicado)
+      const gainBalance = Math.round(actualBalance * dailyRate * 100) / 100
+      const gainSavings = Math.round(actualSavings * dailyRate * 100) / 100
+
+      const newBalance = Math.round((Number(u.initial_balance) + gainBalance) * 100) / 100
+      const newSavings = Math.round((Number(u.savings_initial) + gainSavings) * 100) / 100
+
       await supabase.from('user_settings').update({
         initial_balance:   newBalance,
         savings_initial:   newSavings,

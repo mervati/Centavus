@@ -4,11 +4,6 @@ const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')!
 const SERVICE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const BOT_TOKEN     = Deno.env.get('TELEGRAM_BOT_TOKEN') ?? ''
 
-const YIELD_PCT: Record<string, number> = {
-  mercado_pago:      1.15,
-  mercado_pago_meli: 1.20,
-}
-
 async function sendTelegram(chatId: string, text: string) {
   if (!BOT_TOKEN) return
   await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -25,74 +20,6 @@ Deno.serve(async () => {
   const currentYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY)
-
-  // ── RENDIMENTO DIÁRIO (apenas dias úteis) ──────────────────────────────────
-  let yieldMsg = 'Fim de semana — rendimento pulado'
-  const dow = today.getUTCDay()
-
-  if (dow !== 0 && dow !== 6) {
-    let dailyCDI = 0
-    try {
-      const res  = await fetch('https://api.bcb.gov.br/dados/serie/bcdata.sgs.12/dados/ultimos/1?formato=json')
-      const data = await res.json()
-      dailyCDI   = parseFloat(data[0].valor) / 100
-    } catch {
-      return new Response('Erro ao buscar CDI na API do Banco Central', { status: 500 })
-    }
-
-    if (dailyCDI <= 0) {
-      return new Response('CDI inválido retornado pela API', { status: 500 })
-    }
-
-    const { data: users } = await supabase
-      .from('user_settings')
-      .select('id, initial_balance, savings_initial, yield_type, last_yield_update')
-      .neq('yield_type', 'none')
-
-    let updated = 0
-    for (const u of (users ?? [])) {
-      if (u.last_yield_update === todayStr) continue
-      const pct = YIELD_PCT[u.yield_type]
-      if (!pct) continue
-      const dailyRate = dailyCDI * pct
-
-      // Busca transações para calcular o saldo real atual
-      const { data: txs } = await supabase
-        .from('transactions')
-        .select('amount, type')
-        .eq('user_id', u.id)
-
-      const sum = (type: string) =>
-        (txs ?? []).filter((t: any) => t.type === type).reduce((a: number, t: any) => a + Number(t.amount), 0)
-
-      const income  = sum('income')
-      const expense = sum('expense')
-      const savDep  = sum('savings_deposit')
-      const savWith = sum('savings_withdrawal')
-      const cofInc  = sum('cofrinho_income')
-      const cofExp  = sum('cofrinho_expense')
-
-      // Saldo real = base + todas as transações (igual ao frontend)
-      const actualBalance = Number(u.initial_balance) + income - expense - savDep + savWith
-      const actualSavings = Number(u.savings_initial) + savDep - savWith + cofInc - cofExp
-
-      // Ganho calculado sobre o saldo real, somado ao base (não multiplicado)
-      const gainBalance = Math.round(actualBalance * dailyRate * 100) / 100
-      const gainSavings = Math.round(actualSavings * dailyRate * 100) / 100
-
-      const newBalance = Math.round((Number(u.initial_balance) + gainBalance) * 100) / 100
-      const newSavings = Math.round((Number(u.savings_initial) + gainSavings) * 100) / 100
-
-      await supabase.from('user_settings').update({
-        initial_balance:   newBalance,
-        savings_initial:   newSavings,
-        last_yield_update: todayStr,
-      }).eq('id', u.id)
-      updated++
-    }
-
-    yieldMsg = `Rendimento aplicado para ${updated} usuário(s) — CDI diário: ${(dailyCDI * 100).toFixed(5)}%`
-  }
 
   // ── NOTIFICAÇÕES DE FATURA SEM VENCIMENTO (todos os dias) ─────────────────
   const { data: telegramUsers } = await supabase
@@ -153,5 +80,5 @@ Deno.serve(async () => {
     }
   }
 
-  return new Response(`${yieldMsg} | Notificações de fatura: ${notified} enviadas`, { status: 200 })
+  return new Response(`Notificações de fatura: ${notified} enviadas`, { status: 200 })
 })

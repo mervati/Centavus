@@ -6,7 +6,6 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import TransactionForm from '../components/TransactionForm'
 import { formatCurrency, formatDate, daysUntil, isOverdue, todayISO } from '../utils/format'
-import { calcYieldInfo } from '../utils/yield'
 import { Plus, TrendingUp, TrendingDown, PiggyBank, AlertCircle, LogOut, Settings, ChevronRight } from 'lucide-react'
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions'
 
@@ -52,12 +51,6 @@ export default function Dashboard() {
     const sum = type => rawTx.filter(t => t.type === type).reduce((a, t) => a + Number(t.amount), 0)
     return Number(settings.savings_initial) + sum('savings_deposit') - sum('savings_withdrawal') + sum('cofrinho_income') - sum('cofrinho_expense')
   }, [rawTx, settings])
-
-  const yieldInfo = useMemo(() =>
-    settings
-      ? calcYieldInfo(settings, balance, savings)
-      : { active: false, netBalance: 0, netSavings: 0, grossYieldBank: 0, grossYieldSavings: 0, irLabel: '' }
-  , [settings, balance, savings])
 
   const projection = useMemo(() => {
     if (!settings || rawTx.length === 0) return null
@@ -170,11 +163,6 @@ export default function Dashboard() {
         <p className={`text-3xl font-bold text-white ${(balance + savings) < 0 ? 'text-rose-300' : ''}`}>
           {formatCurrency(balance + savings)}
         </p>
-        {yieldInfo.active && (yieldInfo.grossYieldBank + yieldInfo.grossYieldSavings) > 0 && (
-          <p className="text-white/60 text-xs mt-0.5">
-            Líquido est.: {formatCurrency(yieldInfo.netBalance + yieldInfo.netSavings)} · IR {yieldInfo.irLabel}
-          </p>
-        )}
         {projection !== null && (
           <p className="text-white/40 text-xs mt-1">
             {projection >= (balance + savings) ? '↗' : '↘'} Projeção fim do mês: {formatCurrency(projection)}
@@ -193,9 +181,6 @@ export default function Dashboard() {
             <div>
               <p className="text-xs text-gray-500 font-medium">Saldo Banco</p>
               <p className={`text-lg font-bold ${balance < 0 ? 'text-rose-600' : 'text-yellow-700'}`}>{formatCurrency(balance)}</p>
-              {yieldInfo.active && yieldInfo.grossYieldBank > 0 && (
-                <p className="text-xs text-emerald-600 mt-0.5">+{formatCurrency(yieldInfo.grossYieldBank)} rendimento</p>
-              )}
             </div>
           </div>
         </div>
@@ -210,9 +195,6 @@ export default function Dashboard() {
               <span className="text-xs text-gray-500 font-medium">Cofrinho</span>
             </div>
             <p className="text-lg font-bold text-blue-700">{formatCurrency(savings)}</p>
-            {yieldInfo.active && yieldInfo.grossYieldSavings > 0 && (
-              <p className="text-xs text-emerald-600 mt-0.5">+{formatCurrency(yieldInfo.grossYieldSavings)} rendimento</p>
-            )}
           </div>
 
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">

@@ -3,18 +3,13 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun, Check, TrendingUp, CreditCard, Trash2, Plus, Pencil, X, Send, CheckCircle2, ExternalLink } from 'lucide-react'
+import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun, CreditCard, Trash2, Plus, Pencil, X, Send, CheckCircle2, ExternalLink } from 'lucide-react'
 import { formatCurrency, todayISO } from '../utils/format'
 import { useTheme } from '../contexts/ThemeContext'
 import CurrencyInput from '../components/CurrencyInput'
 
 const CARD_COLORS = ['#6366f1','#3b82f6','#22c55e','#ef4444','#f97316','#ec4899','#eab308','#6b7280']
 
-const YIELD_OPTIONS = [
-  { value: 'none',              label: 'Sem rendimento',        desc: '0% do CDI' },
-  { value: 'mercado_pago',      label: 'Mercado Pago',          desc: '115% do CDI' },
-  { value: 'mercado_pago_meli', label: 'Mercado Pago + Meli',   desc: '120% do CDI' },
-]
 
 export default function Settings() {
   const { user, signOut } = useAuth()
@@ -28,10 +23,6 @@ export default function Settings() {
   const [rebalanceSuccess, setRebalanceSuccess] = useState(false)
   const { permission, subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications()
   const { dark, toggleDark } = useTheme()
-  const [yieldType, setYieldType] = useState('none')
-  const [rawSettings, setRawSettings] = useState(null)
-  const [savingYield, setSavingYield] = useState(false)
-  const [yieldSaved, setYieldSaved] = useState(false)
   const [cards, setCards] = useState([])
   const [showAddCard, setShowAddCard] = useState(false)
   const [newCardName, setNewCardName] = useState('')
@@ -72,12 +63,10 @@ export default function Settings() {
     }
     setCardUsage(usage)
     if (s) {
-      setYieldType(s.yield_type || 'none')
       setTelegramChatId(s.telegram_chat_id || null)
       setTelegramDays1(s.telegram_notify_days_1 ?? 1)
       setTelegramDays2(s.telegram_notify_days_2 ?? null)
       setTelegramHour(s.telegram_notify_hour ?? 8)
-      setRawSettings(s)
       const sum = (type) => (tx || []).filter(t => t.type === type).reduce((a, t) => a + Number(t.amount), 0)
       const income  = sum('income');  const expense = sum('expense')
       const savDep  = sum('savings_deposit'); const savWith = sum('savings_withdrawal')
@@ -201,21 +190,6 @@ export default function Settings() {
     }).eq('id', user.id)
   }
 
-  async function handleYieldChange(newType) {
-    if (newType === yieldType) return
-    setSavingYield(true)
-    const updates = { yield_type: newType }
-    if (yieldType === 'none' && newType !== 'none') {
-      updates.yield_start_date    = todayISO()
-      updates.yield_start_balance = rawSettings.initial_balance
-      updates.yield_start_savings = rawSettings.savings_initial
-    }
-    await supabase.from('user_settings').update(updates).eq('id', user.id)
-    setYieldType(newType)
-    setSavingYield(false)
-    setYieldSaved(true)
-    setTimeout(() => setYieldSaved(false), 3000)
-  }
 
   const initials = (user.email ?? '?')[0].toUpperCase()
 
@@ -382,50 +356,6 @@ export default function Settings() {
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Financeiro</p>
           <div className="space-y-3">
-
-        {/* Rendimento CDI */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 bg-yellow-100 rounded-xl flex items-center justify-center">
-              <TrendingUp size={18} className="text-yellow-600" />
-            </div>
-            <div>
-              <p className="font-medium text-gray-900 text-sm">Rendimento CDI</p>
-              <p className="text-xs text-gray-400">Tipo da sua conta de banco</p>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {YIELD_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => handleYieldChange(opt.value)}
-                disabled={savingYield}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors ${
-                  yieldType === opt.value
-                    ? 'border-yellow-500 bg-yellow-50'
-                    : 'border-gray-200 bg-white'
-                }`}
-              >
-                <div className="text-left">
-                  <p className={`text-sm font-medium ${yieldType === opt.value ? 'text-yellow-700' : 'text-gray-800'}`}>
-                    {opt.label}
-                  </p>
-                  <p className="text-xs text-gray-400">{opt.desc}</p>
-                </div>
-                {yieldType === opt.value && (
-                  <div className="w-5 h-5 rounded-full bg-yellow-500 flex items-center justify-center flex-shrink-0">
-                    <Check size={12} className="text-white" />
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-          {(savingYield || yieldSaved) && (
-            <p className={`text-xs mt-2 text-center ${savingYield ? 'text-yellow-600' : 'text-emerald-600'}`}>
-              {savingYield ? 'Salvando...' : 'Tipo de rendimento atualizado!'}
-            </p>
-          )}
-        </div>
 
         {/* Cartões de Crédito */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

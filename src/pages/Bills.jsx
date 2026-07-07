@@ -30,6 +30,7 @@ export default function Bills() {
   const [cardUnpaid, setCardUnpaid]     = useState({})
   const [cardLimits, setCardLimits]     = useState({})
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [showFuture, setShowFuture]       = useState(false)
   const pillsRef = useRef(null)
 
   const loadBills = useCallback(async () => {
@@ -163,7 +164,10 @@ export default function Bills() {
     setEditDueDate(fatura.dueDate || '')
   }
 
+  const currentYM   = new Date().toISOString().slice(0, 7)
+
   const filtered = bills.filter(b => {
+    if (b.due_date?.slice(0, 7) > currentYM) return false  // futuros ficam na seção expandida
     if (filter === 'pending' && b.paid) return false
     if (filter === 'paid'    && !b.paid) return false
     if (filter === 'overdue' && (b.paid || !isOverdue(b.due_date))) return false
@@ -171,7 +175,16 @@ export default function Bills() {
     return true
   })
 
-  const totalPending = bills.filter(b => !b.paid).reduce((a, b) => a + Number(b.amount), 0)
+  const totalPending = bills.filter(b => !b.paid && b.due_date?.startsWith(currentYM)).reduce((a, b) => a + Number(b.amount), 0)
+
+  const futureBills = bills.filter(b => !b.paid && b.due_date?.slice(0, 7) > currentYM)
+  const futureBillsByMonth = futureBills.reduce((acc, b) => {
+    const ym = b.due_date.slice(0, 7)
+    if (!acc[ym]) acc[ym] = []
+    acc[ym].push(b)
+    return acc
+  }, {})
+  const futureMonths = Object.keys(futureBillsByMonth).sort()
 
   // Uma linha por cartão em Contas a pagar: apenas a fatura mais próxima (menor bill_month)
   const openFaturasByCard = Object.values(
@@ -267,6 +280,73 @@ export default function Bills() {
               </div>
             </div>
           </div>
+
+          {/* Próximos meses */}
+          {futureMonths.length > 0 && (
+            <div className="px-4 mb-1">
+              {!showFuture ? (
+                <button
+                  onClick={() => setShowFuture(true)}
+                  className="w-full py-2.5 rounded-xl border border-dashed border-gray-300 text-gray-500 text-sm font-medium flex items-center justify-center gap-1.5 hover:border-yellow-400 hover:text-yellow-700 transition-colors"
+                >
+                  Ver próximos meses
+                  <span className="text-xs bg-gray-100 text-gray-500 rounded-full px-1.5 py-0.5">{futureBills.length}</span>
+                </button>
+              ) : (
+                <div className="space-y-3 mb-3">
+                  {futureMonths.map(ym => (
+                    <div key={ym}>
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 capitalize">
+                        {new Date(ym + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+                        <span className="ml-2 normal-case font-normal text-gray-400">
+                          · {formatCurrency(futureBillsByMonth[ym].reduce((a, b) => a + Number(b.amount), 0))}
+                        </span>
+                      </p>
+                      <div className="space-y-2">
+                        {futureBillsByMonth[ym].map(bill => {
+                          const badge = getBadge(bill)
+                          return (
+                            <div key={bill.id} className="bg-white rounded-2xl p-3.5 shadow-sm border border-gray-100 flex items-center gap-3">
+                              <button onClick={() => togglePaid(bill)} className="flex-shrink-0 text-gray-300 hover:text-emerald-400">
+                                <Circle size={24} />
+                              </button>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <p className="font-medium text-sm truncate text-gray-900">{bill.description}</p>
+                                  {bill.recurring && <RefreshCw size={11} className="text-gray-400 flex-shrink-0" />}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-xs text-gray-500">Vence {formatDate(bill.due_date)}</p>
+                                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${badge.cls}`}>{badge.label}</span>
+                                </div>
+                              </div>
+                              <p className="font-semibold text-sm text-rose-600 flex-shrink-0">{formatCurrency(bill.amount)}</p>
+                              <div className="flex gap-1">
+                                <button onClick={() => { setEditing(bill); setShowModal(true) }}
+                                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-yellow-600">
+                                  <Pencil size={14} />
+                                </button>
+                                <button onClick={() => handleDelete(bill.id)}
+                                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-rose-600">
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setShowFuture(false)}
+                    className="w-full py-2.5 rounded-xl border border-dashed border-gray-300 text-gray-500 text-sm font-medium flex items-center justify-center gap-1.5 hover:border-yellow-400 hover:text-yellow-700 transition-colors"
+                  >
+                    Mostrar menos
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="px-4 mb-3 relative">
             <Search size={16} className="absolute left-7 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />

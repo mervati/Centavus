@@ -42,7 +42,7 @@ export default function Settings() {
   const [telegramDays2, setTelegramDays2]     = useState(null)
   const [telegramHour, setTelegramHour]       = useState(8)
 
-  const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME
+  const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME ?? 'Centavuss_bot'
 
   const loadData = useCallback(async () => {
     const [{ data: s }, { data: tx }, { data: c }, { data: creditTx }] = await Promise.all([

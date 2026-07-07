@@ -2,13 +2,14 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
-import { formatCurrency, getMonthName } from '../utils/format'
+import Modal from '../components/Modal'
+import { formatCurrency, formatDate, getMonthName } from '../utils/format'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts'
 
-const COLORS         = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#8b5cf6', '#f97316', '#22c55e']
+const COLORS         = ['#ef4444', '#dc2626', '#f87171', '#b91c1c', '#fca5a5', '#991b1b', '#fecaca', '#7f1d1d', '#f97316', '#fb923c']
 const COLORS_INCOME  = ['#10b981', '#34d399', '#059669', '#6ee7b7', '#22c55e', '#16a34a', '#4ade80', '#15803d', '#86efac', '#166534']
 
 const tooltipStyle = { borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }
@@ -37,7 +38,7 @@ const MonthlyBarChart = memo(function MonthlyBarChart({ data }) {
   )
 })
 
-const CategoryPieChart = memo(function CategoryPieChart({ title, data, total, colors }) {
+const CategoryPieChart = memo(function CategoryPieChart({ title, data, total, colors, onCategoryClick }) {
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
       <h3 className="font-semibold text-gray-900 text-sm mb-4">{title}</h3>
@@ -58,7 +59,12 @@ const CategoryPieChart = memo(function CategoryPieChart({ title, data, total, co
         {data.map((cat, i) => {
           const pct = total > 0 ? (cat.value / total * 100).toFixed(0) : 0
           return (
-            <div key={cat.name} className="flex items-center gap-2">
+            <button
+              key={cat.name}
+              type="button"
+              onClick={() => onCategoryClick?.(cat)}
+              className="flex items-center gap-2 w-full text-left rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-colors px-1 py-1 -mx-1"
+            >
               <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: colors[i % colors.length] }} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-0.5">
@@ -70,7 +76,7 @@ const CategoryPieChart = memo(function CategoryPieChart({ title, data, total, co
                 </div>
               </div>
               <span className="text-xs font-medium text-gray-700 ml-2 flex-shrink-0">{formatCurrency(cat.value)}</span>
-            </div>
+            </button>
           )
         })}
       </div>
@@ -86,6 +92,7 @@ export default function Summary() {
   })
   const [rawTx, setRawTx] = useState([])
   const [loading, setLoading] = useState(true)
+  const [catModal, setCatModal] = useState(null) // { name, icon, color, type }
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -99,7 +106,7 @@ export default function Summary() {
 
     const { data: tx } = await supabase
       .from('transactions')
-      .select('amount,type,date,categories(name)')
+      .select('amount,type,date,description,categories(name,icon,color)')
       .eq('user_id', user.id)
       .gte('date', fromISO)
       .lt('date', toISO)
@@ -113,7 +120,7 @@ export default function Summary() {
   // Todos os cálculos derivados via useMemo — recalculam só quando rawTx ou month mudam
   const derived = useMemo(() => {
     const monthTx  = rawTx.filter(t => t.date.startsWith(month))
-    const income   = monthTx.filter(t => t.type === 'income').reduce((a, t) => a + Number(t.amount), 0)
+    const income   = monthTx.filter(t => t.type === 'income' || t.type === 'cofrinho_income').reduce((a, t) => a + Number(t.amount), 0)
     const expense  = monthTx.filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0)
     const savDep   = monthTx.filter(t => t.type === 'savings_deposit').reduce((a, t) => a + Number(t.amount), 0)
     const savWith  = monthTx.filter(t => t.type === 'savings_withdrawal').reduce((a, t) => a + Number(t.amount), 0)
@@ -121,16 +128,18 @@ export default function Summary() {
     const catMap = {}
     monthTx.filter(t => t.type === 'expense').forEach(t => {
       const key = t.categories?.name ?? 'Sem categoria'
-      catMap[key] = (catMap[key] || 0) + Number(t.amount)
+      if (!catMap[key]) catMap[key] = { value: 0, icon: t.categories?.icon ?? '📦', color: t.categories?.color ?? '#6b7280' }
+      catMap[key].value += Number(t.amount)
     })
-    const byCategory = Object.entries(catMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+    const byCategory = Object.entries(catMap).map(([name, v]) => ({ name, value: v.value, icon: v.icon, color: v.color })).sort((a, b) => b.value - a.value)
 
     const incomeMap = {}
-    monthTx.filter(t => t.type === 'income').forEach(t => {
+    monthTx.filter(t => t.type === 'income' || t.type === 'cofrinho_income').forEach(t => {
       const key = t.categories?.name ?? 'Sem categoria'
-      incomeMap[key] = (incomeMap[key] || 0) + Number(t.amount)
+      if (!incomeMap[key]) incomeMap[key] = { value: 0, icon: t.categories?.icon ?? '📦', color: t.categories?.color ?? '#6b7280' }
+      incomeMap[key].value += Number(t.amount)
     })
-    const byCategoryIncome = Object.entries(incomeMap).map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+    const byCategoryIncome = Object.entries(incomeMap).map(([name, v]) => ({ name, value: v.value, icon: v.icon, color: v.color })).sort((a, b) => b.value - a.value)
 
     const [y, m] = month.split('-').map(Number)
     const monthly = []
@@ -207,6 +216,7 @@ export default function Summary() {
               data={derived.byCategoryIncome}
               total={derived.income}
               colors={COLORS_INCOME}
+              onCategoryClick={cat => setCatModal({ ...cat, type: 'income' })}
             />
           )}
 
@@ -216,10 +226,55 @@ export default function Summary() {
               data={derived.byCategory}
               total={derived.expense}
               colors={COLORS}
+              onCategoryClick={cat => setCatModal({ ...cat, type: 'expense' })}
             />
           )}
         </div>
       )}
+      {/* Modal de transações por categoria */}
+      <Modal
+        open={!!catModal}
+        onClose={() => setCatModal(null)}
+        title={catModal ? `${catModal.icon} ${catModal.name}` : ''}
+      >
+        {catModal && (() => {
+          const txs = rawTx
+            .filter(t => t.date.startsWith(month) && (t.categories?.name ?? 'Sem categoria') === catModal.name)
+            .sort((a, b) => b.date.localeCompare(a.date))
+          const total = txs.reduce((s, t) => s + Number(t.amount), 0)
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                <span className="text-xs text-gray-500">{txs.length} transaç{txs.length === 1 ? 'ão' : 'ões'}</span>
+                <span className={`text-sm font-bold ${catModal.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  {catModal.type === 'income' ? '+' : '-'}{formatCurrency(total)}
+                </span>
+              </div>
+              {txs.length === 0 ? (
+                <p className="text-center text-gray-400 text-sm py-4">Nenhuma transação</p>
+              ) : (
+                <div className="space-y-2 max-h-96 overflow-y-auto">
+                  {txs.map((t, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0"
+                        style={{ backgroundColor: (catModal.color ?? '#6b7280') + '22' }}>
+                        {catModal.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{t.description ?? '—'}</p>
+                        <p className="text-xs text-gray-400">{formatDate(t.date)}</p>
+                      </div>
+                      <span className={`text-sm font-semibold flex-shrink-0 ${catModal.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {catModal.type === 'income' ? '+' : '-'}{formatCurrency(t.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })()}
+      </Modal>
     </Layout>
   )
 }

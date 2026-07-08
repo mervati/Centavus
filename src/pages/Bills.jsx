@@ -174,6 +174,12 @@ export default function Bills() {
     return Number(settings.initial_balance) + sum('income') - sum('expense') - sum('savings_deposit') + sum('savings_withdrawal')
   }, [rawTx, settings])
 
+  const savings = useMemo(() => {
+    if (!settings) return 0
+    const sum = type => rawTx.filter(t => t.type === type).reduce((a, t) => a + Number(t.amount), 0)
+    return Number(settings.savings_initial) + sum('savings_deposit') - sum('savings_withdrawal') + sum('cofrinho_income') - sum('cofrinho_expense')
+  }, [rawTx, settings])
+
   const currentYM   = new Date().toISOString().slice(0, 7)
 
   const filtered = bills.filter(b => {
@@ -285,7 +291,7 @@ export default function Bills() {
                   </p>
                 )}
                 <p className="text-xs text-rose-500 font-medium mt-2">
-                  💳 Saldo disponível: {formatCurrency((totalPending + totalFaturas) - balance)}
+                  💳 Saldo após pagamento: {formatCurrency((balance + savings) - (totalPending + totalFaturas))}
                 </p>
               </div>
               <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center">

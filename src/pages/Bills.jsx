@@ -383,7 +383,7 @@ export default function Bills() {
 
           <div className="px-4 mb-3 flex gap-2 overflow-x-auto scrollbar-hide">
             {[['pending','Em aberto'],['overdue','Vencidas'],['paid','Pagas'],['all','Todas']].map(([val, label]) => (
-              <button key={val} onClick={() => { setFilter(val); setPaidMonthFilter('') }}
+              <button key={val} onClick={() => { setFilter(val); val === 'paid' ? setPaidMonthFilter(currentYM) : setPaidMonthFilter('') }}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
                   filter === val ? 'bg-yellow-600 text-white' : 'bg-white border border-gray-200 text-gray-600'
                 }`}>

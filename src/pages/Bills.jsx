@@ -31,16 +31,20 @@ export default function Bills() {
   const [cardLimits, setCardLimits]     = useState({})
   const [selectedMonth, setSelectedMonth] = useState('')
   const [showFuture, setShowFuture]       = useState(false)
+  const [settings, setSettings]         = useState(null)
+  const [rawTx, setRawTx]               = useState([])
   const pillsRef = useRef(null)
 
   const loadBills = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('bills')
-      .select('*, categories(name,icon,color)')
-      .eq('user_id', user.id)
-      .order('due_date')
-    setBills(data ?? [])
+    const [{ data: s }, { data: bill }, { data: tx }] = await Promise.all([
+      supabase.from('user_settings').select('*').eq('id', user.id).single(),
+      supabase.from('bills').select('*, categories(name,icon,color)').eq('user_id', user.id).order('due_date'),
+      supabase.from('transactions').select('amount,type,date').eq('user_id', user.id),
+    ])
+    setSettings(s)
+    setBills(bill ?? [])
+    setRawTx(tx ?? [])
     setLoading(false)
   }, [user.id])
 
@@ -164,6 +168,12 @@ export default function Bills() {
     setEditDueDate(fatura.dueDate || '')
   }
 
+  const balance = useMemo(() => {
+    if (!settings) return 0
+    const sum = type => rawTx.filter(t => t.type === type).reduce((a, t) => a + Number(t.amount), 0)
+    return Number(settings.initial_balance) + sum('income') - sum('expense') - sum('savings_deposit') + sum('savings_withdrawal')
+  }, [rawTx, settings])
+
   const currentYM   = new Date().toISOString().slice(0, 7)
 
   const filtered = bills.filter(b => {
@@ -274,6 +284,9 @@ export default function Bills() {
                     Contas: {formatCurrency(totalPending)} · Faturas: {formatCurrency(totalFaturas)}
                   </p>
                 )}
+                <p className="text-xs text-rose-500 font-medium mt-2">
+                  💳 Saldo disponível: {formatCurrency((totalPending + totalFaturas) - balance)}
+                </p>
               </div>
               <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center">
                 <span className="text-2xl">📋</span>

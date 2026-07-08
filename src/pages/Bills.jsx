@@ -33,6 +33,7 @@ export default function Bills() {
   const [showFuture, setShowFuture]       = useState(false)
   const [settings, setSettings]         = useState(null)
   const [rawTx, setRawTx]               = useState([])
+  const [paidMonthFilter, setPaidMonthFilter] = useState('')
   const pillsRef = useRef(null)
 
   const loadBills = useCallback(async () => {
@@ -185,7 +186,8 @@ export default function Bills() {
   const filtered = bills.filter(b => {
     if (filter !== 'paid' && b.due_date?.slice(0, 7) > currentYM) return false  // futuros ficam na seção expandida, exceto contas pagas
     if (filter === 'pending' && b.paid) return false
-    if (filter === 'paid'    && !b.paid) return false
+    if (filter === 'paid' && !b.paid) return false
+    if (filter === 'paid' && paidMonthFilter && !b.due_date?.startsWith(paidMonthFilter)) return false
     if (filter === 'overdue' && (b.paid || !isOverdue(b.due_date))) return false
     if (search.trim() && !b.description.toLowerCase().includes(search.trim().toLowerCase())) return false
     return true
@@ -381,7 +383,7 @@ export default function Bills() {
 
           <div className="px-4 mb-3 flex gap-2 overflow-x-auto scrollbar-hide">
             {[['pending','Em aberto'],['overdue','Vencidas'],['paid','Pagas'],['all','Todas']].map(([val, label]) => (
-              <button key={val} onClick={() => setFilter(val)}
+              <button key={val} onClick={() => { setFilter(val); setPaidMonthFilter('') }}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
                   filter === val ? 'bg-yellow-600 text-white' : 'bg-white border border-gray-200 text-gray-600'
                 }`}>
@@ -389,6 +391,15 @@ export default function Bills() {
               </button>
             ))}
           </div>
+
+          {filter === 'paid' && (
+            <div className="px-4 mb-3">
+              <input type="month" value={paidMonthFilter}
+                onChange={e => setPaidMonthFilter(e.target.value)}
+                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                placeholder="Selecione o mês..." />
+            </div>
+          )}
 
           {loading ? (
             <div className="flex justify-center py-12">

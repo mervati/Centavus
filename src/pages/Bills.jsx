@@ -183,7 +183,7 @@ export default function Bills() {
   const currentYM   = new Date().toISOString().slice(0, 7)
 
   const filtered = bills.filter(b => {
-    if (b.due_date?.slice(0, 7) > currentYM) return false  // futuros ficam na seção expandida
+    if (filter !== 'paid' && b.due_date?.slice(0, 7) > currentYM) return false  // futuros ficam na seção expandida, exceto contas pagas
     if (filter === 'pending' && b.paid) return false
     if (filter === 'paid'    && !b.paid) return false
     if (filter === 'overdue' && (b.paid || !isOverdue(b.due_date))) return false

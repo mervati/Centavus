@@ -6,7 +6,7 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import TransactionForm from '../components/TransactionForm'
 import { formatCurrency, formatDate, daysUntil, isOverdue, todayISO } from '../utils/format'
-import { Plus, TrendingUp, TrendingDown, PiggyBank, AlertCircle, LogOut, Settings, ChevronRight, Percent, Check } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, PiggyBank, AlertCircle, LogOut, Settings, ChevronRight, Percent, Check, Edit2, Eye, EyeOff, GripVertical } from 'lucide-react'
 import CurrencyInput from '../components/CurrencyInput'
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions'
 
@@ -44,6 +44,13 @@ export default function Dashboard() {
   const [yieldMode, setYieldMode]       = useState('diff')  // 'diff'=só rendimento | 'full'=saldo completo
   const [yieldAmt, setYieldAmt]         = useState(0)
   const [yieldLoading, setYieldLoading] = useState(false)
+  const [editMode, setEditMode]         = useState(false)
+  const [dashboardLayout, setDashboardLayout] = useState([
+    { id: 'saldo_banco', visible: true, order: 1 },
+    { id: 'cofrinho_apagar', visible: true, order: 2 },
+    { id: 'proximas_contas', visible: true, order: 3 },
+    { id: 'ultimas_transacoes', visible: true, order: 4 },
+  ])
 
   // Valores derivados — recalculam só quando rawTx ou settings mudam
   const balance = useMemo(() => {
@@ -106,6 +113,13 @@ export default function Dashboard() {
     setRawTx(tx ?? [])
     setRecentTx(recent ?? [])
     setUpcomingBills(bills || [])
+    if (s?.dashboard_layout) {
+      try {
+        setDashboardLayout(JSON.parse(s.dashboard_layout))
+      } catch (e) {
+        // Use default layout
+      }
+    }
     setLoading(false)
   }, [user.id])
 
@@ -148,6 +162,23 @@ export default function Dashboard() {
     loadData()
   }
 
+  async function toggleCardVisibility(id) {
+    const updated = dashboardLayout.map(c => c.id === id ? { ...c, visible: !c.visible } : c)
+    setDashboardLayout(updated)
+    await supabase.from('user_settings').update({ dashboard_layout: JSON.stringify(updated) }).eq('id', user.id)
+  }
+
+  async function moveCard(id, direction) {
+    const idx = dashboardLayout.findIndex(c => c.id === id)
+    if ((direction === 'up' && idx === 0) || (direction === 'down' && idx === dashboardLayout.length - 1)) return
+    const updated = [...dashboardLayout]
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    ;[updated[idx].order, updated[swapIdx].order] = [updated[swapIdx].order, updated[idx].order]
+    updated.sort((a, b) => a.order - b.order)
+    setDashboardLayout(updated)
+    await supabase.from('user_settings').update({ dashboard_layout: JSON.stringify(updated) }).eq('id', user.id)
+  }
+
   const txTypeStyle = t => ({
     income: 'text-emerald-600',
     expense: 'text-rose-600',
@@ -179,6 +210,12 @@ export default function Dashboard() {
           </div>
           <div className="flex gap-2">
             <button
+              onClick={() => setEditMode(!editMode)}
+              className={`w-9 h-9 rounded-full flex items-center justify-center ${editMode ? 'bg-yellow-500 text-white' : 'bg-white/20 text-white'}`}
+            >
+              <Edit2 size={18} />
+            </button>
+            <button
               onClick={() => navigate('/configuracoes')}
               className="w-9 h-9 bg-white/20 rounded-full flex items-center justify-center text-white"
             >
@@ -204,9 +241,53 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Edit Mode */}
+      {editMode && (
+        <div className="px-4 py-4 bg-yellow-50 border-b-2 border-yellow-200 space-y-2">
+          <p className="text-xs font-semibold text-yellow-900 uppercase tracking-wide">Customizar dashboard</p>
+          <div className="space-y-2">
+            {dashboardLayout.map((card, idx) => {
+              const cardNames = {
+                saldo_banco: 'Saldo Banco',
+                cofrinho_apagar: 'Cofrinho + A pagar',
+                proximas_contas: 'Próximas contas',
+                ultimas_transacoes: 'Últimas transações',
+              }
+              return (
+                <div key={card.id} className="flex items-center gap-2 bg-white rounded-xl p-3 border border-yellow-100">
+                  <GripVertical size={16} className="text-yellow-600 flex-shrink-0" />
+                  <span className="flex-1 text-sm font-medium text-gray-900">{cardNames[card.id]}</span>
+                  <button
+                    onClick={() => moveCard(card.id, 'up')}
+                    disabled={idx === 0}
+                    className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-600 disabled:opacity-40"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveCard(card.id, 'down')}
+                    disabled={idx === dashboardLayout.length - 1}
+                    className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-600 disabled:opacity-40"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => toggleCardVisibility(card.id)}
+                    className="w-8 h-8 flex items-center justify-center rounded bg-gray-100 text-gray-600 hover:bg-yellow-200"
+                  >
+                    {card.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Cards */}
       <div className="px-4 -mt-4 space-y-3 mb-6">
         {/* Saldo Banco — full width */}
+        {dashboardLayout.find(c => c.id === 'saldo_banco')?.visible && (
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-yellow-100 rounded-xl flex items-center justify-center">
@@ -221,8 +302,10 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Cofrinho + A pagar */}
+        {dashboardLayout.find(c => c.id === 'cofrinho_apagar')?.visible && (
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <div className="flex items-center gap-2 mb-2">
@@ -247,6 +330,7 @@ export default function Dashboard() {
             <p className="text-lg font-bold text-amber-700">{upcomingBills.length} conta{upcomingBills.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
+        )}
       </div>
 
       {/* Add transaction button */}
@@ -268,7 +352,7 @@ export default function Dashboard() {
       </div>
 
       {/* Upcoming bills */}
-      {upcomingBills.length > 0 && (
+      {dashboardLayout.find(c => c.id === 'proximas_contas')?.visible && upcomingBills.length > 0 && (
         <section className="px-4 mb-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-gray-900">Próximas contas</h2>
@@ -296,7 +380,7 @@ export default function Dashboard() {
       )}
 
       {/* Recent transactions */}
-      {recentTx.length > 0 && (
+      {dashboardLayout.find(c => c.id === 'ultimas_transacoes')?.visible && recentTx.length > 0 && (
         <section className="px-4 mb-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="font-semibold text-gray-900">Últimas transações</h2>

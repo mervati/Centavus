@@ -5,7 +5,7 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import { formatCurrency, formatDate, getMonthName } from '../utils/format'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts'
 
@@ -33,6 +33,69 @@ const MonthlyBarChart = memo(function MonthlyBarChart({ data }) {
             <Bar dataKey="despesa" fill="#ef4444" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
+      </div>
+    </div>
+  )
+})
+
+const EvolutionLineChart = memo(function EvolutionLineChart({ data }) {
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+      <h3 className="font-semibold text-gray-900 text-sm mb-4">Evolução do saldo</h3>
+      <div style={{ width: '100%', overflowX: 'hidden' }}>
+        <ResponsiveContainer width="99%" height={200}>
+          <LineChart data={data} margin={{ top: 0, right: 8, left: -16, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} />
+            <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} width={36} />
+            <Tooltip
+              formatter={(value) => formatCurrency(value)}
+              contentStyle={tooltipStyle}
+            />
+            <Line type="monotone" dataKey="saldo" stroke="#06b6d4" strokeWidth={2} dot={{ fill: '#06b6d4', r: 4 }} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+})
+
+const CategoryComparison = memo(function CategoryComparison({ currentMonth, previousMonth, allCategories }) {
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+      <h3 className="font-semibold text-gray-900 text-sm mb-4">Comparação mês a mês (Despesas)</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b border-gray-200">
+              <th className="text-left py-2 px-2 font-medium text-gray-700">Categoria</th>
+              <th className="text-right py-2 px-2 font-medium text-gray-700">Este mês</th>
+              <th className="text-right py-2 px-2 font-medium text-gray-700">Mês anterior</th>
+              <th className="text-right py-2 px-2 font-medium text-gray-700">Diferença</th>
+            </tr>
+          </thead>
+          <tbody>
+            {allCategories.map((cat, i) => {
+              const current = currentMonth[cat.name] ?? 0
+              const previous = previousMonth[cat.name] ?? 0
+              const diff = current - previous
+              const diffPct = previous > 0 ? ((diff / previous) * 100).toFixed(0) : '—'
+              return (
+                <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                  <td className="py-2 px-2 font-medium text-gray-900 flex items-center gap-2">
+                    <span>{cat.icon}</span> {cat.name}
+                  </td>
+                  <td className="text-right py-2 px-2 text-gray-700">{formatCurrency(current)}</td>
+                  <td className="text-right py-2 px-2 text-gray-500">{formatCurrency(previous)}</td>
+                  <td className={`text-right py-2 px-2 font-medium ${diff > 0 ? 'text-rose-600' : diff < 0 ? 'text-emerald-600' : 'text-gray-500'}`}>
+                    {diff !== 0 ? `${diff > 0 ? '+' : ''}${formatCurrency(diff)}` : '—'}
+                    {diffPct !== '—' && <span className="text-gray-400 ml-1">({diffPct}%)</span>}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
       </div>
     </div>
   )
@@ -154,7 +217,33 @@ export default function Summary() {
       })
     }
 
-    return { income, expense, savDep, savWith, byCategory, byCategoryIncome, monthly }
+    // Comparação mês a mês
+    const [py, pm] = (() => {
+      const prev = new Date(y, m - 2, 1)
+      return [prev.getFullYear(), String(prev.getMonth() + 1).padStart(2, '0')]
+    })()
+    const prevYM = `${py}-${pm}`
+
+    const prevMonthTx = rawTx.filter(t => t.date.startsWith(prevYM) && t.type === 'expense')
+    const prevCatMap = {}
+    prevMonthTx.forEach(t => {
+      const key = t.categories?.name ?? 'Sem categoria'
+      prevCatMap[key] = (prevCatMap[key] ?? 0) + Number(t.amount)
+    })
+
+    const currCatMap = {}
+    monthTx.filter(t => t.type === 'expense').forEach(t => {
+      const key = t.categories?.name ?? 'Sem categoria'
+      currCatMap[key] = (currCatMap[key] ?? 0) + Number(t.amount)
+    })
+
+    const allCats = [...new Set([...Object.keys(currCatMap), ...Object.keys(prevCatMap)])].sort()
+    const comparisonCats = allCats.map(name => {
+      const cat = byCategory.find(b => b.name === name) || { name, icon: '📦', color: '#6b7280' }
+      return cat
+    })
+
+    return { income, expense, savDep, savWith, byCategory, byCategoryIncome, monthly, currCatMap, prevCatMap, comparisonCats }
   }, [rawTx, month])
 
   const balance = derived.income - derived.expense
@@ -209,6 +298,14 @@ export default function Summary() {
           )}
 
           <MonthlyBarChart data={derived.monthly} />
+
+          <EvolutionLineChart data={derived.monthly} />
+
+          <CategoryComparison
+            currentMonth={derived.currCatMap}
+            previousMonth={derived.prevCatMap}
+            allCategories={derived.comparisonCats}
+          />
 
           {derived.byCategoryIncome.length > 0 && (
             <CategoryPieChart

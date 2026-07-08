@@ -202,9 +202,9 @@ export default function Bills() {
   }, {})
   const futureMonths = Object.keys(futureBillsByMonth).sort()
 
-  // Uma linha por cartão em Contas a pagar: apenas a fatura mais próxima (menor bill_month)
+  // Uma linha por cartão em Contas a pagar: apenas faturas do mês atual
   const openFaturasByCard = Object.values(
-    faturas.filter(f => !f.allPaid).reduce((acc, f) => {
+    faturas.filter(f => !f.allPaid && f.billMonth === currentYM).reduce((acc, f) => {
       const key = f.cardId
       if (!acc[key] || f.billMonth < acc[key].billMonth) {
         acc[key] = { cardId: f.cardId, card: f.card, total: f.total, billMonth: f.billMonth, key: f.key, dueDate: f.dueDate }

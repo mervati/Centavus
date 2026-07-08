@@ -213,8 +213,8 @@ export default function Bills() {
     }, {})
   )
 
-  // totalFaturas = apenas a fatura mais próxima por cartão (para o Total em aberto)
-  const totalFaturas    = openFaturasByCard.reduce((a, f) => a + f.total, 0)
+  // totalFaturas = apenas faturas do mês atual (para o Total em aberto)
+  const totalFaturas    = openFaturasByCard.filter(f => f.billMonth === currentYM).reduce((a, f) => a + f.total, 0)
   // totalFaturasAll = soma de todos os meses em aberto (para o banner da aba Faturas)
   const totalFaturasAll = faturas.filter(f => !f.allPaid).reduce((a, f) => a + f.total, 0)
 

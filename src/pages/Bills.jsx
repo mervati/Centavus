@@ -221,22 +221,43 @@ export default function Bills() {
   const totalFaturasAll = faturas.filter(f => !f.allPaid).reduce((a, f) => a + f.total, 0)
 
   useEffect(() => {
+    if (tab === 'faturas') {
+      const currentYM = new Date().toISOString().slice(0, 7)
+      setSelectedMonth(currentYM)
+    }
+  }, [tab])
+
+  useEffect(() => {
     if (!pillsRef.current || !selectedMonth) return
     const active = pillsRef.current.querySelector('[data-active="true"]')
     if (active) active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
   }, [selectedMonth, tab])
 
   const availableMonths = useMemo(() => {
-    const currentYM = new Date().toISOString().slice(0, 7)
+    const now = new Date()
+    const startDate = new Date(2026, 0, 1) // janeiro de 2026
+
+    // Encontra o mês mais recente com faturas abertas
     const fMonths = [...new Set(faturas.map(f => f.billMonth))].sort()
-    const latest = fMonths.length > 0 && fMonths[fMonths.length - 1] > currentYM
-      ? fMonths[fMonths.length - 1]
-      : currentYM
-    const [ly, lm] = latest.split('-').map(Number)
-    return Array.from({ length: 12 }, (_, i) => {
-      const d = new Date(ly, lm - 1 - (11 - i), 1)
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    })
+    const latestFaturaMonth = fMonths.length > 0 ? fMonths[fMonths.length - 1] : null
+
+    // Usa o mês da fatura mais recente ou o mês atual, o que for maior
+    let endMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    if (latestFaturaMonth && latestFaturaMonth > endMonthStr) {
+      endMonthStr = latestFaturaMonth
+    }
+
+    const [ey, em] = endMonthStr.split('-').map(Number)
+    const endDate = new Date(ey, em, 1)
+
+    const months = []
+    let current = new Date(startDate)
+    while (current <= endDate) {
+      const ym = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}`
+      months.push(ym)
+      current.setMonth(current.getMonth() + 1)
+    }
+    return months
   }, [faturas])
 
   const visibleFaturas = useMemo(

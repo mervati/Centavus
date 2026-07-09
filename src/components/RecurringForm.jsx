@@ -11,6 +11,9 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
   const [amount, setAmount] = useState(initial?.amount ?? 0)
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? '')
   const [categories, setCategories] = useState([])
+  const [cards, setCards] = useState([])
+  const [cardId, setCardId] = useState(initial?.card_id ?? '')
+  const [paymentMethod, setPaymentMethod] = useState(initial?.card_id ? 'credit' : 'pix')
   const [dayOfMonth, setDayOfMonth] = useState(initial?.day_of_month ?? 5)
   const [startDate, setStartDate] = useState(
     initial?.start_date ? initial.start_date.slice(0, 7) : new Date().toISOString().slice(0, 7)
@@ -36,6 +39,27 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
       })
   }, [user.id, type, initial?.category_id])
 
+  useEffect(() => {
+    if (type === 'expense') {
+      supabase
+        .from('credit_cards')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('name')
+        .then(({ data }) => {
+          setCards(data ?? [])
+          if (initial?.card_id && data?.find(c => c.id === initial.card_id)) {
+            setCardId(initial.card_id)
+          }
+        })
+      if (!initial) setPaymentMethod('pix')
+    } else {
+      setCards([])
+      setCardId('')
+      setPaymentMethod('pix')
+    }
+  }, [user.id, type, initial?.card_id])
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!description.trim()) return setError('Informe uma descrição.')
@@ -49,7 +73,9 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
       amount,
       type,
       category_id: categoryId || null,
+      card_id: type === 'expense' ? cardId || null : null,
       day_of_month: Number(dayOfMonth),
+      installments: 1,
       start_date: startDate + '-01',
       end_date: endDate ? endDate + '-28' : null,
     }
@@ -84,6 +110,64 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
           </button>
         ))}
       </div>
+
+      {/* Forma de pagamento (apenas para despesa) */}
+      {type === 'expense' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Forma de pagamento</label>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {[['pix', 'Pix'], ['credit', 'Crédito']].map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => {
+                  setPaymentMethod(val)
+                  if (val === 'pix') setCardId('')
+                }}
+                className={`py-2 px-3 rounded-xl border text-sm font-medium transition-all ${
+                  paymentMethod === val
+                    ? val === 'credit'
+                      ? 'bg-purple-100 text-purple-700 border-purple-200'
+                      : 'bg-blue-100 text-blue-700 border-blue-200'
+                    : 'bg-gray-50 text-gray-500 border-gray-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Cartões (apenas se selecionou crédito) */}
+          {paymentMethod === 'credit' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cartão</label>
+              <div className="grid grid-cols-2 gap-2">
+                {cards.length === 0 ? (
+                  <p className="text-xs text-center text-gray-500 col-span-2 bg-gray-50 rounded-xl py-3">
+                    Nenhum cartão cadastrado
+                  </p>
+                ) : (
+                  cards.map(card => (
+                    <button
+                      key={card.id}
+                      type="button"
+                      onClick={() => setCardId(card.id)}
+                      className={`py-2 px-3 rounded-xl border text-sm font-medium transition-all ${
+                        cardId === card.id
+                          ? 'text-white'
+                          : 'bg-gray-50 text-gray-600 border-gray-200'
+                      }`}
+                      style={cardId === card.id ? { backgroundColor: card.color, borderColor: card.color } : {}}
+                    >
+                      {card.name}
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Descrição */}
       <div>

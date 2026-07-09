@@ -7,6 +7,13 @@ import { todayISO, formatCurrency } from '../utils/format'
 import { addToQueue } from '../utils/offlineCache'
 import { CreditCard, Wallet, PiggyBank, AlertCircle, WifiOff } from 'lucide-react'
 
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
+}
+
 function calcBillMonth(purchaseDate, closingDay, installmentIndex) {
   const d = new Date(purchaseDate + 'T12:00:00')
   const purchaseDay = d.getDate()
@@ -40,6 +47,8 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
   const [loading, setLoading]           = useState(false)
   const [error, setError]               = useState('')
   const [cardUsed, setCardUsed]         = useState(0)
+  const [isRecurring, setIsRecurring]   = useState(false)
+  const [recurringGroupId, setRecurringGroupId] = useState(null)
   const pendingCatId = useRef(null)
 
   const isTransfer  = mainType === 'transfer' || mainType === 'transfer_out'
@@ -103,6 +112,8 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
     setDescription(initial.description ?? '')
     setDate(initial.date ?? todayISO())
     setCategoryId(initial.category_id || '')
+    setIsRecurring(initial.is_recurring ?? false)
+    setRecurringGroupId(initial.recurring_group_id || null)
     pendingCatId.current = initial.category_id || ''
   }, [initial])
 
@@ -111,6 +122,8 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
     setPayMethod('')
     setSelectedCard(null)
     setInstallments(1)
+    setIsRecurring(false)
+    setRecurringGroupId(null)
   }
 
   function resolveType() {
@@ -160,10 +173,52 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
           category_id:        categoryId || null,
           card_id:            selectedCard,
           bill_month:         calcBillMonth(date, card?.closing_day ?? 1, installNum - 1),
+          is_recurring:       installNum === 1 ? isRecurring : false,
+          recurring_group_id: isRecurring ? recurringGroupId : null,
         }
         const { error: err } = await supabase.from('transactions').update(row).eq('id', initial.id)
         setLoading(false)
         if (err) return setError(err.message)
+
+        // Se é recorrente e é a primeira parcela, cria/atualiza em recurring_transactions
+        if (isRecurring && installNum === 1 && recurringGroupId) {
+          const purchaseDay = new Date(date).getDate()
+          const currentYM = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+
+          // Verifica se já existe
+          const { data: existing } = await supabase
+            .from('recurring_transactions')
+            .select('id')
+            .eq('group_id', recurringGroupId)
+            .maybeSingle()
+
+          if (existing) {
+            // Atualiza
+            await supabase.from('recurring_transactions')
+              .update({
+                description: description.trim(),
+                amount: totalAmt,
+                card_id: selectedCard,
+                category_id: categoryId || null,
+                day_of_month: purchaseDay,
+              })
+              .eq('id', existing.id)
+          } else {
+            // Cria novo
+            await supabase.from('recurring_transactions').insert({
+              user_id: user.id,
+              group_id: recurringGroupId,
+              description: description.trim(),
+              amount: totalAmt,
+              card_id: selectedCard,
+              installments: totalInst,
+              category_id: categoryId || null,
+              closing_day: card?.closing_day ?? 1,
+              day_of_month: purchaseDay,
+              last_created_month: currentYM,
+            })
+          }
+        }
       } else {
         // Nova transação: insere todas as parcelas
         const installAmt = Math.round(totalAmt / installments * 100) / 100
@@ -181,6 +236,8 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
           installment_number: i + 1,
           bill_month:         calcBillMonth(date, card.closing_day, i),
           bill_paid:          false,
+          is_recurring:       i === 0 ? isRecurring : false,
+          recurring_group_id: isRecurring ? recurringGroupId : null,
         }))
         if (!navigator.onLine) {
           rows.forEach(r => addToQueue(r))
@@ -191,6 +248,23 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
         const { error: err } = await supabase.from('transactions').insert(rows)
         setLoading(false)
         if (err) return setError(err.message)
+
+        // Se é recorrente, cria um registro em recurring_transactions
+        if (isRecurring && recurringGroupId) {
+          const purchaseDay = new Date(date).getDate()
+          await supabase.from('recurring_transactions').insert({
+            user_id: user.id,
+            group_id: recurringGroupId,
+            description: description.trim(),
+            amount: totalAmt,
+            card_id: selectedCard,
+            installments,
+            category_id: categoryId || null,
+            closing_day: card.closing_day,
+            day_of_month: purchaseDay,
+            last_created_month: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+          })
+        }
       }
     } else {
       const row = {
@@ -374,6 +448,25 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
                 <CategorySelect value={categoryId} onChange={setCategoryId} categories={categories} />
+              </div>
+            )}
+
+            {payMethod === 'credit' && (
+              <div className="border-t pt-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Recorrência</p>
+                <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                  <input type="checkbox" id="recurring" checked={isRecurring}
+                    onChange={e => {
+                      setIsRecurring(e.target.checked)
+                      if (e.target.checked && !recurringGroupId) {
+                        setRecurringGroupId(generateUUID())
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
+                  <label htmlFor="recurring" className="text-xs font-medium text-blue-700 cursor-pointer">
+                    Cobrar todo mês automaticamente
+                  </label>
+                </div>
               </div>
             )}
 

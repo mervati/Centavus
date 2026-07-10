@@ -39,6 +39,9 @@ const MonthlyBarChart = memo(function MonthlyBarChart({ data }) {
 })
 
 const EvolutionLineChart = memo(function EvolutionLineChart({ data }) {
+  const finalSaldo = data.length > 0 ? data[data.length - 1].saldo : 0
+  const lineColor = finalSaldo >= 0 ? '#10b981' : '#ef4444'
+
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
       <h3 className="font-semibold text-gray-900 text-sm mb-4">Evolução do saldo</h3>
@@ -52,7 +55,18 @@ const EvolutionLineChart = memo(function EvolutionLineChart({ data }) {
               formatter={(value) => formatCurrency(value)}
               contentStyle={tooltipStyle}
             />
-            <Line type="monotone" dataKey="saldo" stroke="#06b6d4" strokeWidth={2} dot={{ fill: '#06b6d4', r: 4 }} />
+            <Line
+              type="monotone"
+              dataKey="saldo"
+              stroke={lineColor}
+              strokeWidth={2.5}
+              dot={point => (
+                <g key={`dot-${point.payload.name}`}>
+                  <circle cx={point.x} cy={point.y} r={4} fill={point.payload.saldo >= 0 ? '#10b981' : '#ef4444'} stroke="white" strokeWidth={2} />
+                </g>
+              )}
+              isAnimationActive={false}
+            />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -206,14 +220,19 @@ export default function Summary() {
 
     const [y, m] = month.split('-').map(Number)
     const monthly = []
+    let accumulatedBalance = 0
     for (let i = 5; i >= 0; i--) {
       const d  = new Date(y, m - 1 - i, 1)
       const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const mTx = rawTx.filter(t => t.date.startsWith(ym))
+      const mReceita = mTx.filter(t => t.type === 'income').reduce((a, t) => a + Number(t.amount), 0)
+      const mDespesa = mTx.filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0)
+      accumulatedBalance += (mReceita - mDespesa)
       monthly.push({
         name:    d.toLocaleDateString('pt-BR', { month: 'short' }),
-        receita: mTx.filter(t => t.type === 'income').reduce((a, t) => a + Number(t.amount), 0),
-        despesa: mTx.filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0),
+        receita: mReceita,
+        despesa: mDespesa,
+        saldo:   accumulatedBalance,
       })
     }
 

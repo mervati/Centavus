@@ -140,6 +140,7 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
     setError('')
     if (!amount || amount <= 0) return setError('Informe um valor válido.')
     if (!description.trim()) return setError('Informe uma descrição.')
+    if (!categoryId) return setError('Selecione uma categoria.')
     if (payMethod === 'credit' && !selectedCard) return setError('Selecione um cartão.')
     if (payMethod === 'credit' && selectedCard) {
       const card  = cards.find(c => c.id === selectedCard)

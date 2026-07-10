@@ -82,6 +82,15 @@ export default function Settings() {
   async function handleRebalance(e) {
     e.preventDefault()
     setRebalancing(true)
+
+    // Busca a categoria "Re-balanço"
+    const { data: category } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('name', 'Re-balanço')
+      .maybeSingle()
+
     const inserts = []
 
     if (newBank !== '') {
@@ -93,7 +102,7 @@ export default function Settings() {
           type: diff > 0 ? 'income' : 'expense',
           description: 'Re-balanço',
           date: todayISO(),
-          category_id: null,
+          category_id: category?.id ?? null,
         })
       }
     }
@@ -107,7 +116,7 @@ export default function Settings() {
           type: diff > 0 ? 'savings_deposit' : 'savings_withdrawal',
           description: 'Re-balanço',
           date: todayISO(),
-          category_id: null,
+          category_id: category?.id ?? null,
         })
       }
     }

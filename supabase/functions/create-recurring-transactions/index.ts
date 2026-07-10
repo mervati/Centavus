@@ -100,9 +100,10 @@ serve(async (req) => {
       }
 
       // Cria as parcelas para este mês
+      const txType = template.card_id ? "credit_expense" : template.type
       const rows = Array.from({ length: template.installments }, (_, i) => ({
         user_id: template.user_id,
-        type: "credit_expense",
+        type: txType,
         amount: Math.round((template.amount / template.installments) * 100) / 100,
         total_amount: template.amount,
         description:
@@ -111,7 +112,7 @@ serve(async (req) => {
             : template.description,
         date: txDateStr,
         category_id: template.category_id,
-        payment_method: "credit",
+        payment_method: template.card_id ? "credit" : (template.payment_method ?? (template.type === 'income' ? 'transfer' : 'cash')),
         card_id: template.card_id,
         installments: template.installments,
         installment_number: i + 1,

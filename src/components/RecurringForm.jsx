@@ -14,6 +14,7 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
   const [cards, setCards] = useState([])
   const [cardId, setCardId] = useState(initial?.card_id ?? '')
   const [paymentMethod, setPaymentMethod] = useState(initial?.card_id ? 'credit' : 'pix')
+  const [destination, setDestination] = useState(initial?.payment_method ?? 'transfer')
   const [dayOfMonth, setDayOfMonth] = useState(initial?.day_of_month ?? 5)
   const [startDate, setStartDate] = useState(
     initial?.start_date ? initial.start_date.slice(0, 7) : new Date().toISOString().slice(0, 7)
@@ -64,6 +65,7 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
     e.preventDefault()
     if (!description.trim()) return setError('Informe uma descrição.')
     if (!amount || amount <= 0) return setError('Informe um valor válido.')
+    if (!categoryId) return setError('Selecione uma categoria.')
     if (dayOfMonth < 1 || dayOfMonth > 28) return setError('Dia deve ser entre 1 e 28.')
 
     setLoading(true)
@@ -74,6 +76,7 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
       type,
       category_id: categoryId || null,
       card_id: type === 'expense' ? cardId || null : null,
+      payment_method: type === 'income' ? destination : (paymentMethod === 'credit' ? 'credit' : 'pix'),
       day_of_month: Number(dayOfMonth),
       installments: 1,
       start_date: startDate + '-01',
@@ -110,6 +113,31 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
           </button>
         ))}
       </div>
+
+      {/* Destino (apenas para receita) */}
+      {type === 'income' && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Destino</label>
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            {[['transfer', 'Banco'], ['cash', 'Cofrinho']].map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setDestination(val)}
+                className={`py-2 px-3 rounded-xl border text-sm font-medium transition-all ${
+                  destination === val
+                    ? val === 'transfer'
+                      ? 'bg-blue-100 text-blue-700 border-blue-200'
+                      : 'bg-amber-100 text-amber-700 border-amber-200'
+                    : 'bg-gray-50 text-gray-500 border-gray-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Forma de pagamento (apenas para despesa) */}
       {type === 'expense' && (

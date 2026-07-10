@@ -34,6 +34,7 @@ export default function Bills() {
   const [settings, setSettings]         = useState(null)
   const [rawTx, setRawTx]               = useState([])
   const [paidMonthFilter, setPaidMonthFilter] = useState('')
+  const [selectedFaturaDetail, setSelectedFaturaDetail] = useState(null)
   const pillsRef = useRef(null)
 
   const loadBills = useCallback(async () => {
@@ -55,6 +56,7 @@ export default function Bills() {
       .select('*, credit_cards(id, name, color, closing_day, credit_limit)')
       .eq('user_id', user.id)
       .eq('type', 'credit_expense')
+      .not('card_id', 'is', null)
       .order('bill_month')
       .order('date')
 
@@ -120,13 +122,22 @@ export default function Bills() {
   async function payFatura(fatura) {
     setPayingFatura(fatura.key)
     const monthLabel = formatBillMonth(fatura.billMonth)
+
+    // Busca a categoria "Cartão"
+    const { data: category } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('name', 'Cartão')
+      .maybeSingle()
+
     await supabase.from('transactions').insert({
       user_id: user.id,
       type: 'expense',
       amount: Math.round(fatura.total * 100) / 100,
       description: `Fatura ${fatura.card.name} - ${monthLabel}`,
       date: todayISO(),
-      category_id: null,
+      category_id: category?.id ?? null,
       payment_method: 'pix',
       wallet: 'banco',
     })
@@ -486,7 +497,7 @@ export default function Bills() {
                     const pct      = limit > 0 ? Math.min((used / limit) * 100, 100) : 0
                     const barColor = pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
                     return (
-                      <div key={fc.cardId} className="bg-white rounded-2xl p-3.5 shadow-sm border border-purple-100">
+                      <div key={fc.cardId} onClick={() => setSelectedFaturaDetail(fc)} className="bg-white rounded-2xl p-3.5 shadow-sm border border-purple-100 cursor-pointer hover:shadow-md transition-shadow">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                             style={{ backgroundColor: (fc.card?.color ?? '#9333ea') + '22' }}>
@@ -590,7 +601,7 @@ export default function Bills() {
             </div>
             <div className="px-4 space-y-3 pb-4">
               {visibleFaturas.map(fatura => (
-                <div key={fatura.key} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div key={fatura.key} onClick={() => setSelectedFaturaDetail(fatura)} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden cursor-pointer hover:shadow-md transition-shadow">
                   {/* Header */}
                   <div className="flex items-center justify-between p-3.5 border-b border-gray-50">
                     <div className="flex items-center gap-2.5">
@@ -632,7 +643,7 @@ export default function Bills() {
                               {fatura.dueDate ? formatDate(fatura.dueDate) : '—'}
                             </p>
                           </div>
-                          <button onClick={() => startEditDueDate(fatura)}
+                          <button onClick={(e) => { e.stopPropagation(); startEditDueDate(fatura) }}
                             className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-purple-600 rounded-lg hover:bg-purple-50">
                             <Pencil size={14} />
                           </button>
@@ -667,7 +678,7 @@ export default function Bills() {
                   {/* Pay button */}
                   {!fatura.allPaid ? (
                     <div className="px-3.5 pb-3.5">
-                      <button onClick={() => payFatura(fatura)} disabled={payingFatura === fatura.key}
+                      <button onClick={(e) => { e.stopPropagation(); payFatura(fatura) }} disabled={payingFatura === fatura.key}
                         className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-yellow-600 text-white text-sm font-semibold disabled:opacity-60 active:scale-98">
                         <Wallet size={15} />
                         {payingFatura === fatura.key ? 'Pagando...' : 'Pagar fatura'}
@@ -697,6 +708,39 @@ export default function Bills() {
 
       <Modal open={showModal} onClose={() => setShowModal(false)} title={editing ? 'Editar conta' : 'Nova conta'}>
         <BillForm initial={editing} onSuccess={() => { setShowModal(false); loadBills() }} onCancel={() => setShowModal(false)} />
+      </Modal>
+
+      {/* Detalhe de Fatura */}
+      <Modal open={!!selectedFaturaDetail} onClose={() => setSelectedFaturaDetail(null)} title={`${selectedFaturaDetail?.card?.name} - ${formatBillMonth(selectedFaturaDetail?.billMonth)}`}>
+        {selectedFaturaDetail && (
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div>
+                <p className="text-sm text-gray-500">Total</p>
+                <p className="text-xl font-bold text-gray-900">{formatCurrency(selectedFaturaDetail.total)}</p>
+              </div>
+              <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
+                selectedFaturaDetail.allPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-purple-100 text-purple-700'
+              }`}>
+                {selectedFaturaDetail.allPaid ? 'Paga' : 'Em aberto'}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {selectedFaturaDetail.items?.map(tx => (
+                <div key={tx.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{tx.description}</p>
+                    <p className="text-xs text-gray-500">{formatDate(tx.date)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm text-gray-900">{formatCurrency(tx.amount)}</p>
+                    {tx.bill_paid && <CheckCircle2 size={14} className="text-emerald-600" />}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </Modal>
     </Layout>
   )

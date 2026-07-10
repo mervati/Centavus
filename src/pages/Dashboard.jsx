@@ -90,6 +90,10 @@ export default function Dashboard() {
   , [rawTx])
 
   const loadData = useCallback(async () => {
+    const today = new Date()
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
+    const firstDayOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1).toISOString().split('T')[0]
+
     const [{ data: s }, { data: tx }, { data: recent }, { data: bills }] = await Promise.all([
       supabase.from('user_settings').select('*').eq('id', user.id).single(),
       supabase.from('transactions').select('amount,type,date,description').eq('user_id', user.id),
@@ -100,7 +104,7 @@ export default function Dashboard() {
         .order('date', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(5),
-      supabase.from('bills').select('*').eq('user_id', user.id).eq('paid', false).gte('due_date', todayISO()).order('due_date').limit(5),
+      supabase.from('bills').select('*').eq('user_id', user.id).eq('paid', false).gte('due_date', firstDayOfMonth).lt('due_date', firstDayOfNextMonth).order('due_date'),
     ])
 
     if (!s) {
@@ -148,13 +152,22 @@ export default function Dashboard() {
     const gain = yieldMode === 'diff' ? yieldAmt : yieldAmt - currentVal
     if (gain <= 0) return
     setYieldLoading(true)
+
+    // Busca a categoria "Rendimento"
+    const { data: category } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('name', 'Rendimento')
+      .maybeSingle()
+
     await supabase.from('transactions').insert({
       user_id:     user.id,
       amount:      gain,
       type:        yieldTarget === 'bank' ? 'income' : 'cofrinho_income',
       description: 'Rendimento',
       date:        todayISO(),
-      category_id: null,
+      category_id: category?.id ?? null,
     })
     setShowYieldModal(false)
     setYieldAmt(0)

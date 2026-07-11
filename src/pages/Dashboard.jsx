@@ -14,7 +14,7 @@ const DEFAULT_CATEGORIES = [
   { name: 'Salário', type: 'income', color: '#22c55e', icon: '💼' },
   { name: 'Freelance', type: 'income', color: '#10b981', icon: '💻' },
   { name: 'Investimentos', type: 'income', color: '#06b6d4', icon: '📈' },
-  { name: 'Rendimento', type: 'income', color: '#059669', icon: '📊' },
+  { name: 'Rendimento', type: 'income', color: '#059669', icon: '💸' },
   { name: 'Outros (entrada)', type: 'income', color: '#8b5cf6', icon: '➕' },
   { name: 'Alimentação', type: 'expense', color: '#f97316', icon: '🍔' },
   { name: 'Transporte', type: 'expense', color: '#3b82f6', icon: '🚗' },
@@ -24,7 +24,7 @@ const DEFAULT_CATEGORIES = [
   { name: 'Lazer', type: 'expense', color: '#ec4899', icon: '🎮' },
   { name: 'Roupas', type: 'expense', color: '#8b5cf6', icon: '👗' },
   { name: 'Cartão', type: 'expense', color: '#a855f7', icon: '💳' },
-  { name: 'Re-balanço', type: 'expense', color: '#f97316', icon: '⚖️' },
+  { name: 'Re-balanço', type: 'expense', color: '#f97316', icon: '💰' },
   { name: 'Outros (saída)', type: 'expense', color: '#6b7280', icon: '➖' },
 ]
 

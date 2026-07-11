@@ -33,13 +33,16 @@ function isDue(frequency: string, lastSent: string | null, today: Date): boolean
 Deno.serve(async (_req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE)
 
+  const now = new Date()
+  const currentUTCHour = now.getUTCHours()
+
   const today = new Date()
   today.setUTCHours(0, 0, 0, 0)
   const todayStr = today.toISOString().split('T')[0]
 
   const { data: users } = await supabase
     .from('user_settings')
-    .select('id, telegram_chat_id, backup_frequency, backup_last_sent')
+    .select('id, telegram_chat_id, backup_frequency, backup_last_sent, telegram_notify_hour')
     .not('telegram_chat_id', 'is', null)
     .not('backup_frequency', 'is', null)
     .neq('backup_frequency', 'off')
@@ -49,6 +52,11 @@ Deno.serve(async (_req) => {
   let sent = 0
 
   for (const user of users) {
+    // Só envia no horário configurado pelo usuário (mesmo das notificações)
+    const notifyHourBRT = user.telegram_notify_hour ?? 8
+    const notifyHourUTC = (notifyHourBRT + 3) % 24  // BRT = UTC-3
+    if (currentUTCHour !== notifyHourUTC) continue
+
     if (!isDue(user.backup_frequency, user.backup_last_sent, today)) continue
 
     // Coleta todos os dados do usuário

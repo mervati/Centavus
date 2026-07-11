@@ -98,6 +98,7 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
       installments: 1,
       start_date: startDate + '-01',
       end_date: endDate ? endDate + '-28' : null,
+      last_created_month: initial?.id ? undefined : null,
     }
 
     const { error: err } = initial?.id

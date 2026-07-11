@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun, CreditCard, Trash2, Plus, Pencil, X, Send, CheckCircle2, ExternalLink } from 'lucide-react'
+import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun, CreditCard, Trash2, Plus, Pencil, X, Send, CheckCircle2, ExternalLink, HardDrive } from 'lucide-react'
 import { formatCurrency, todayISO } from '../utils/format'
 import { useTheme } from '../contexts/ThemeContext'
 import CurrencyInput from '../components/CurrencyInput'
@@ -41,6 +41,7 @@ export default function Settings() {
   const [telegramDays1, setTelegramDays1]     = useState(1)
   const [telegramDays2, setTelegramDays2]     = useState(null)
   const [telegramHour, setTelegramHour]       = useState(8)
+  const [backupFrequency, setBackupFrequency] = useState('off')
 
   const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME ?? 'Centavuss_bot'
 
@@ -67,6 +68,7 @@ export default function Settings() {
       setTelegramDays1(s.telegram_notify_days_1 ?? 1)
       setTelegramDays2(s.telegram_notify_days_2 ?? null)
       setTelegramHour(s.telegram_notify_hour ?? 8)
+      setBackupFrequency(s.backup_frequency ?? 'off')
       const sum = (type) => (tx || []).filter(t => t.type === type).reduce((a, t) => a + Number(t.amount), 0)
       const income  = sum('income');  const expense = sum('expense')
       const savDep  = sum('savings_deposit'); const savWith = sum('savings_withdrawal')
@@ -182,6 +184,11 @@ export default function Settings() {
   async function handleDisconnectTelegram() {
     await supabase.from('user_settings').update({ telegram_chat_id: null }).eq('id', user.id)
     setTelegramChatId(null)
+  }
+
+  async function saveBackupFrequency(freq) {
+    setBackupFrequency(freq)
+    await supabase.from('user_settings').update({ backup_frequency: freq }).eq('id', user.id)
   }
 
   async function saveTelegramSettings({ days1, days2, hour } = {}) {
@@ -508,6 +515,52 @@ export default function Settings() {
                 {addingCard ? 'Adicionando...' : 'Adicionar cartão'}
               </button>
             </form>
+          )}
+        </div>
+
+        {/* Backup automático */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-4 flex items-center gap-3">
+            <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <HardDrive size={18} className="text-emerald-600" />
+            </div>
+            <div>
+              <p className="font-medium text-gray-900 text-sm">Backup automático</p>
+              <p className="text-xs text-gray-400">Recebe uma cópia dos seus dados no Telegram</p>
+            </div>
+          </div>
+
+          {!telegramChatId ? (
+            <div className="px-4 pb-4">
+              <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                Conecte o Telegram (abaixo) para ativar o backup automático.
+              </p>
+            </div>
+          ) : (
+            <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+              <label className="block text-xs font-medium text-gray-600 mb-2">Frequência</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[['off', 'Desligado'], ['daily', 'Todo dia'], ['weekly', 'Toda semana'], ['monthly', 'Todo mês']].map(([val, label]) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => saveBackupFrequency(val)}
+                    className={`py-2.5 rounded-xl border text-sm font-medium transition-all ${
+                      backupFrequency === val
+                        ? 'bg-emerald-100 text-emerald-700 border-emerald-200'
+                        : 'bg-gray-50 text-gray-500 border-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {backupFrequency !== 'off' && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Você receberá um arquivo <span className="font-medium">.json</span> no Telegram com todas as suas transações, contas, cartões e recorrências.
+                </p>
+              )}
+            </div>
           )}
         </div>
 

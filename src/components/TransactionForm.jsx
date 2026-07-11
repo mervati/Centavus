@@ -452,25 +452,6 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
               </div>
             )}
 
-            {payMethod === 'credit' && (
-              <div className="border-t pt-4">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Recorrência</p>
-                <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-100 rounded-xl">
-                  <input type="checkbox" id="recurring" checked={isRecurring}
-                    onChange={e => {
-                      setIsRecurring(e.target.checked)
-                      if (e.target.checked && !recurringGroupId) {
-                        setRecurringGroupId(generateUUID())
-                      }
-                    }}
-                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer" />
-                  <label htmlFor="recurring" className="text-xs font-medium text-blue-700 cursor-pointer">
-                    Cobrar todo mês automaticamente
-                  </label>
-                </div>
-              </div>
-            )}
-
             {!navigator.onLine && !error && (
               <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-3">
                 <WifiOff size={15} className="text-amber-500 flex-shrink-0" />

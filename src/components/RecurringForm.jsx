@@ -192,6 +192,13 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
                   ))
                 )}
               </div>
+              {cardId && (
+                <div className="mt-2 p-2.5 bg-blue-50 rounded-xl border border-blue-100">
+                  <p className="text-xs text-blue-600 font-medium">
+                    Limite: <span className="font-bold">{cards.find(c => c.id === cardId)?.credit_limit ? `R$ ${Number(cards.find(c => c.id === cardId)?.credit_limit).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Sem limite'}</span>
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>

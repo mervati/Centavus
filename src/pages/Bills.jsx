@@ -727,14 +727,28 @@ export default function Bills() {
             </div>
             <div className="space-y-2">
               {selectedFaturaDetail.items?.map(tx => (
-                <div key={tx.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+                <div key={tx.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{tx.description}</p>
                     <p className="text-xs text-gray-500">{formatDate(tx.date)}</p>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <p className="font-semibold text-sm text-gray-900">{formatCurrency(tx.amount)}</p>
                     {tx.bill_paid && <CheckCircle2 size={14} className="text-emerald-600" />}
+                    <button onClick={() => { setEditing(tx); setSelectedFaturaDetail(null); setShowModal(true) }}
+                      className="p-1.5 text-gray-300 hover:text-yellow-600 transition-colors">
+                      <Pencil size={14} />
+                    </button>
+                    <button onClick={async () => {
+                      if (confirm('Excluir esta transação?')) {
+                        await supabase.from('transactions').delete().eq('id', tx.id)
+                        loadFaturas()
+                        setSelectedFaturaDetail(null)
+                      }
+                    }}
+                      className="p-1.5 text-gray-300 hover:text-rose-500 transition-colors">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </div>
               ))}

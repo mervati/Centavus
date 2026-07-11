@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import { usePushNotifications } from '../hooks/usePushNotifications'
-import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun, CreditCard, Trash2, Plus, Pencil, X, Send, CheckCircle2, ExternalLink, HardDrive } from 'lucide-react'
+import { Bell, BellOff, RefreshCw, ChevronDown, ChevronUp, Moon, Sun, CreditCard, Trash2, Plus, Pencil, X, Send, CheckCircle2, ExternalLink, HardDrive, Upload } from 'lucide-react'
 import { formatCurrency, todayISO } from '../utils/format'
 import { useTheme } from '../contexts/ThemeContext'
 import CurrencyInput from '../components/CurrencyInput'
@@ -42,6 +42,9 @@ export default function Settings() {
   const [telegramDays2, setTelegramDays2]     = useState(null)
   const [telegramHour, setTelegramHour]       = useState(8)
   const [backupFrequency, setBackupFrequency] = useState('off')
+  const [restoring, setRestoring]             = useState(false)
+  const [restoreError, setRestoreError]       = useState('')
+  const [restoreSuccess, setRestoreSuccess]   = useState(false)
 
   const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME ?? 'Centavuss_bot'
 
@@ -189,6 +192,61 @@ export default function Settings() {
   async function saveBackupFrequency(freq) {
     setBackupFrequency(freq)
     await supabase.from('user_settings').update({ backup_frequency: freq }).eq('id', user.id)
+  }
+
+  async function handleRestore(e) {
+    setRestoreError('')
+    setRestoreSuccess(false)
+    const file = e.target.files?.[0]
+    e.target.value = '' // permite selecionar o mesmo arquivo de novo
+    if (!file) return
+
+    let backup
+    try {
+      backup = JSON.parse(await file.text())
+    } catch {
+      return setRestoreError('Arquivo inválido — não é um JSON.')
+    }
+
+    if (backup?.app !== 'Centavus' || !backup?.data) {
+      return setRestoreError('Este arquivo não é um backup do Centavus.')
+    }
+
+    if (!confirm('ATENÇÃO: isto vai APAGAR todos os seus dados atuais e substituir pelos do backup. Esta ação não pode ser desfeita.\n\nContinuar?')) return
+
+    setRestoring(true)
+    const d = backup.data
+    const uid = user.id
+    const withUser = (rows) => (rows || []).map(r => ({ ...r, user_id: uid }))
+
+    // 1. Apaga os dados atuais (filhos primeiro, respeitando as chaves estrangeiras)
+    await supabase.from('transactions').delete().eq('user_id', uid)
+    await supabase.from('bills').delete().eq('user_id', uid)
+    await supabase.from('recurring_transactions').delete().eq('user_id', uid)
+    await supabase.from('credit_cards').delete().eq('user_id', uid)
+    await supabase.from('categories').delete().eq('user_id', uid)
+
+    // 2. Insere os dados do backup (pais primeiro)
+    const steps = [
+      ['categories', d.categories],
+      ['credit_cards', d.credit_cards],
+      ['recurring_transactions', d.recurring_transactions],
+      ['transactions', d.transactions],
+      ['bills', d.bills],
+    ]
+    for (const [table, rows] of steps) {
+      if (rows?.length) {
+        const { error } = await supabase.from(table).insert(withUser(rows))
+        if (error) {
+          setRestoring(false)
+          return setRestoreError(`Erro ao restaurar ${table}: ${error.message}`)
+        }
+      }
+    }
+
+    setRestoring(false)
+    setRestoreSuccess(true)
+    loadData()
   }
 
   async function saveTelegramSettings({ days1, days2, hour } = {}) {
@@ -562,6 +620,25 @@ export default function Settings() {
               )}
             </div>
           )}
+
+          {/* Restaurar backup */}
+          <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+            <label className="block text-xs font-medium text-gray-600 mb-1">Restaurar backup</label>
+            <p className="text-xs text-gray-400 mb-2">
+              Selecione um arquivo <span className="font-medium">.json</span> de backup. Isto <span className="text-rose-600 font-medium">apaga os dados atuais</span> e substitui pelos do arquivo.
+            </p>
+            <label className={`w-full py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-medium flex items-center justify-center gap-2 cursor-pointer ${restoring ? 'opacity-60 pointer-events-none' : ''}`}>
+              <Upload size={15} />
+              {restoring ? 'Restaurando...' : 'Escolher arquivo de backup'}
+              <input type="file" accept="application/json,.json" onChange={handleRestore} className="hidden" disabled={restoring} />
+            </label>
+            {restoreError && (
+              <p className="text-xs text-rose-600 mt-2">{restoreError}</p>
+            )}
+            {restoreSuccess && (
+              <p className="text-xs text-emerald-600 mt-2">✓ Backup restaurado com sucesso!</p>
+            )}
+          </div>
         </div>
 
           </div>{/* fim space-y-3 Financeiro */}

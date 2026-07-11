@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import CategorySelect from './CategorySelect'
 import CurrencyInput from './CurrencyInput'
+import { formatCurrency } from '../utils/format'
 
 export default function RecurringForm({ initial, onSuccess, onCancel }) {
   const { user } = useAuth()
@@ -22,6 +23,7 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
   const [endDate, setEndDate] = useState(initial?.end_date ? initial.end_date.slice(0, 7) : '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [cardUsage, setCardUsage] = useState({})
 
   useEffect(() => {
     supabase
@@ -60,6 +62,21 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
       setPaymentMethod('pix')
     }
   }, [user.id, type, initial?.card_id])
+
+  useEffect(() => {
+    if (!cardId) { setCardUsage({}); return }
+    supabase
+      .from('transactions')
+      .select('amount')
+      .eq('user_id', user.id)
+      .eq('card_id', cardId)
+      .eq('type', 'credit_expense')
+      .eq('bill_paid', false)
+      .then(({ data }) => {
+        const used = (data ?? []).reduce((s, t) => s + Number(t.amount), 0)
+        setCardUsage({ [cardId]: used })
+      })
+  }, [cardId, user.id])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -192,13 +209,26 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
                   ))
                 )}
               </div>
-              {cardId && (
-                <div className="mt-2 p-2.5 bg-blue-50 rounded-xl border border-blue-100">
-                  <p className="text-xs text-blue-600 font-medium">
-                    Limite: <span className="font-bold">{cards.find(c => c.id === cardId)?.credit_limit ? `R$ ${Number(cards.find(c => c.id === cardId)?.credit_limit).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Sem limite'}</span>
-                  </p>
-                </div>
-              )}
+              {cardId && (() => {
+                const card = cards.find(c => c.id === cardId)
+                const used = cardUsage[cardId] || 0
+                const limit = Number(card?.credit_limit) || 0
+                const available = limit - used
+                const pct = limit > 0 ? Math.min((used / limit) * 100, 100) : 0
+                const barColor = pct >= 90 ? 'bg-rose-500' : pct >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+
+                return limit > 0 ? (
+                  <div className="mt-2 px-0.5">
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="text-emerald-600 font-semibold">Disponível: {formatCurrency(Math.max(available, 0))}</span>
+                      <span className="text-gray-400">Limite: {formatCurrency(limit)}</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                ) : null
+              })()}
             </div>
           )}
         </div>

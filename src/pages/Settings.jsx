@@ -17,6 +17,9 @@ export default function Settings() {
   const [savings, setSavings] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showRebalance, setShowRebalance] = useState(false)
+  const [showTelegram, setShowTelegram] = useState(false)
+  const [showCards, setShowCards]       = useState(false)
+  const [showBackup, setShowBackup]     = useState(false)
   const [newBank, setNewBank] = useState('')
   const [newSavings, setNewSavings] = useState('')
   const [rebalancing, setRebalancing] = useState(false)
@@ -310,11 +313,11 @@ export default function Settings() {
         <div>
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Notificações</p>
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-4 flex items-center gap-3">
+          <button onClick={() => setShowTelegram(v => !v)} className="w-full p-4 flex items-center gap-3">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${telegramChatId ? 'bg-blue-100' : 'bg-gray-100'}`}>
               <Send size={18} className={telegramChatId ? 'text-blue-500' : 'text-gray-400'} />
             </div>
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 text-left">
               <p className="font-medium text-gray-900 text-sm">Telegram</p>
               <p className="text-xs text-gray-400">
                 {telegramChatId ? 'Conectado — alertas ativos' : 'Receba alertas sobre contas'}
@@ -325,9 +328,12 @@ export default function Settings() {
                 <CheckCircle2 size={13} className="text-white" fill="white" />
               </div>
             )}
-          </div>
+            {showTelegram
+              ? <ChevronUp size={18} className="text-gray-400 flex-shrink-0" />
+              : <ChevronDown size={18} className="text-gray-400 flex-shrink-0" />}
+          </button>
 
-          {telegramChatId ? (
+          {showTelegram && (telegramChatId ? (
             <div className="px-4 pb-4 border-t border-gray-100 pt-3 space-y-4">
 
               {/* 1º Alerta */}
@@ -422,7 +428,7 @@ export default function Settings() {
                 </p>
               )}
             </div>
-          )}
+          ))}
         </div>
         </div>
 
@@ -433,24 +439,25 @@ export default function Settings() {
 
         {/* Cartões de Crédito */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-4 flex items-center justify-between">
+          <button onClick={() => setShowCards(v => !v)} className="w-full p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center">
                 <CreditCard size={18} className="text-purple-600" />
               </div>
-              <div>
+              <div className="text-left">
                 <p className="font-medium text-gray-900 text-sm">Cartões de Crédito</p>
                 <p className="text-xs text-gray-400">{cards.length === 0 ? 'Nenhum cadastrado' : `${cards.length} cartão${cards.length !== 1 ? 'ões' : ''}`}</p>
               </div>
             </div>
-            <button onClick={() => setShowAddCard(v => !v)}
-              className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${showAddCard ? 'bg-gray-200 text-gray-600' : 'bg-purple-100 text-purple-600'}`}>
-              {showAddCard ? <X size={15} /> : <Plus size={15} />}
-            </button>
-          </div>
+            {showCards
+              ? <ChevronUp size={18} className="text-gray-400" />
+              : <ChevronDown size={18} className="text-gray-400" />}
+          </button>
 
+          {showCards && (
+          <div className="border-t border-gray-100">
           {cards.length > 0 && (
-            <div className="px-4 pb-3 space-y-3 border-t border-gray-100 pt-3">
+            <div className="px-4 pb-3 space-y-3 pt-3">
               {cards.map(card => {
                 const used  = cardUsage[card.id] || 0
                 const limit = Number(card.credit_limit) || 0
@@ -540,8 +547,15 @@ export default function Settings() {
             </div>
           )}
 
+          <div className="px-4 pb-4 pt-1">
+            <button type="button" onClick={() => setShowAddCard(v => !v)}
+              className={`w-full py-2 rounded-xl border text-sm font-medium flex items-center justify-center gap-2 transition-colors ${showAddCard ? 'border-gray-300 text-gray-600' : 'border-purple-200 text-purple-600 bg-purple-50'}`}>
+              {showAddCard ? <><X size={15} /> Cancelar</> : <><Plus size={15} /> Adicionar cartão</>}
+            </button>
+          </div>
+
           {showAddCard && (
-            <form onSubmit={handleAddCard} className="px-4 pb-4 pt-3 border-t border-gray-100 space-y-3">
+            <form onSubmit={handleAddCard} className="px-4 pb-4 space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Nome do cartão</label>
                 <input type="text" placeholder="Ex: Santander, Neon..."
@@ -574,20 +588,26 @@ export default function Settings() {
               </button>
             </form>
           )}
+          </div>
+          )}
         </div>
 
         {/* Backup automático */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="p-4 flex items-center gap-3">
+          <button onClick={() => setShowBackup(v => !v)} className="w-full p-4 flex items-center gap-3">
             <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center">
               <HardDrive size={18} className="text-emerald-600" />
             </div>
-            <div>
+            <div className="flex-1 text-left">
               <p className="font-medium text-gray-900 text-sm">Backup automático</p>
               <p className="text-xs text-gray-400">Recebe uma cópia dos seus dados no Telegram</p>
             </div>
-          </div>
+            {showBackup
+              ? <ChevronUp size={18} className="text-gray-400 flex-shrink-0" />
+              : <ChevronDown size={18} className="text-gray-400 flex-shrink-0" />}
+          </button>
 
+          {showBackup && (<>
           {!telegramChatId ? (
             <div className="px-4 pb-4">
               <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
@@ -639,6 +659,7 @@ export default function Settings() {
               <p className="text-xs text-emerald-600 mt-2">✓ Backup restaurado com sucesso!</p>
             )}
           </div>
+          </>)}
         </div>
 
           </div>{/* fim space-y-3 Financeiro */}

@@ -16,7 +16,7 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
   const [cardId, setCardId] = useState(initial?.card_id ?? '')
   const [paymentMethod, setPaymentMethod] = useState(initial?.card_id ? 'credit' : 'pix')
   const [destination, setDestination] = useState(initial?.payment_method ?? 'transfer')
-  const [dayOfMonth, setDayOfMonth] = useState(initial?.day_of_month ?? 5)
+  const [dayOfMonth, setDayOfMonth] = useState(initial?.day_of_month ?? Math.min(new Date().getDate(), 28))
   const [startDate, setStartDate] = useState(
     initial?.start_date ? initial.start_date.slice(0, 7) : new Date().toISOString().slice(0, 7)
   )

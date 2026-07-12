@@ -117,7 +117,7 @@ export default function Dashboard() {
       supabase.from('bills').select('*').eq('user_id', user.id).eq('paid', false).gte('due_date', firstDayOfMonth).lt('due_date', firstDayOfNextMonth).order('due_date'),
       // faturas de cartão em aberto (para juntar em "Próximas contas")
       supabase.from('transactions')
-        .select('amount, card_id, bill_month, bill_due_date, credit_cards(name, closing_day, due_day)')
+        .select('amount, card_id, bill_month, bill_due_date, credit_cards(name, closing_day)')
         .eq('user_id', user.id)
         .eq('type', 'credit_expense')
         .eq('bill_paid', false)
@@ -140,7 +140,7 @@ export default function Dashboard() {
       if (!faturaMap[key]) faturaMap[key] = {
         card_id: t.card_id,
         name: t.credit_cards?.name,
-        dueDay: t.credit_cards?.due_day || t.credit_cards?.closing_day,
+        closingDay: t.credit_cards?.closing_day,
         dueDate: null,
         total: 0,
       }
@@ -148,7 +148,7 @@ export default function Dashboard() {
       if (t.bill_due_date) faturaMap[key].dueDate = t.bill_due_date
     }
     const faturaBills = Object.values(faturaMap).map(f => {
-      const day = Math.min(f.dueDay || 1, lastDay)
+      const day = Math.min(f.closingDay || 1, lastDay)
       const due = f.dueDate || new Date(today.getFullYear(), today.getMonth(), day).toISOString().split('T')[0]
       return {
         id: `fatura-${f.card_id}-${currentYM}`,

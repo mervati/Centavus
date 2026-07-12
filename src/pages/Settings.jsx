@@ -30,7 +30,6 @@ export default function Settings() {
   const [showAddCard, setShowAddCard] = useState(false)
   const [newCardName, setNewCardName] = useState('')
   const [newCardDay, setNewCardDay] = useState('')
-  const [newCardDueDay, setNewCardDueDay] = useState('')
   const [newCardColor, setNewCardColor] = useState('#6366f1')
   const [newCardLimit, setNewCardLimit] = useState(0)
   const [addingCard, setAddingCard] = useState(false)
@@ -38,7 +37,6 @@ export default function Settings() {
   const [editingCardId, setEditingCardId] = useState(null)
   const [editName, setEditName]   = useState('')
   const [editDay, setEditDay]     = useState('')
-  const [editDueDay, setEditDueDay] = useState('')
   const [editColor, setEditColor] = useState('#6366f1')
   const [editLimit, setEditLimit] = useState(0)
   const [updatingCard, setUpdatingCard] = useState(false)
@@ -144,13 +142,11 @@ export default function Settings() {
     const day = Number(newCardDay)
     if (day < 1 || day > 31) return
     setAddingCard(true)
-    const dueDay = Number(newCardDueDay)
     await supabase.from('credit_cards').insert({
       user_id: user.id, name: newCardName.trim(), closing_day: day, color: newCardColor,
       credit_limit: newCardLimit > 0 ? newCardLimit : null,
-      due_day: dueDay >= 1 && dueDay <= 31 ? dueDay : null,
     })
-    setNewCardName(''); setNewCardDay(''); setNewCardDueDay(''); setNewCardColor('#6366f1'); setNewCardLimit(0); setShowAddCard(false)
+    setNewCardName(''); setNewCardDay(''); setNewCardColor('#6366f1'); setNewCardLimit(0); setShowAddCard(false)
     setAddingCard(false)
     loadData()
   }
@@ -165,7 +161,6 @@ export default function Settings() {
     setEditingCardId(card.id)
     setEditName(card.name)
     setEditDay(String(card.closing_day))
-    setEditDueDay(card.due_day ? String(card.due_day) : '')
     setEditColor(card.color)
     setEditLimit(Number(card.credit_limit) || 0)
   }
@@ -175,13 +170,11 @@ export default function Settings() {
     const day = Number(editDay)
     if (!editName.trim() || !editDay || day < 1 || day > 31) return
     setUpdatingCard(true)
-    const dueDay = Number(editDueDay)
     await supabase.from('credit_cards').update({
       name:         editName.trim(),
       closing_day:  day,
       color:        editColor,
       credit_limit: editLimit > 0 ? editLimit : null,
-      due_day:      dueDay >= 1 && dueDay <= 31 ? dueDay : null,
     }).eq('id', editingCardId)
     setEditingCardId(null)
     setUpdatingCard(false)
@@ -473,17 +466,10 @@ export default function Settings() {
                         <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
                           className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
                       </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Dia de fechamento</label>
-                          <input type="number" min="1" max="31" value={editDay} onChange={e => setEditDay(e.target.value)}
-                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Dia de vencimento</label>
-                          <input type="number" min="1" max="31" placeholder="Ex: 10" value={editDueDay} onChange={e => setEditDueDay(e.target.value)}
-                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-                        </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Dia de fechamento</label>
+                        <input type="number" min="1" max="31" value={editDay} onChange={e => setEditDay(e.target.value)}
+                          className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-600 mb-1">Limite do cartão (R$)</label>
@@ -570,19 +556,11 @@ export default function Settings() {
                   value={newCardName} onChange={e => setNewCardName(e.target.value)}
                   className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Dia de fechamento</label>
-                  <input type="number" min="1" max="31" placeholder="Ex: 15"
-                    value={newCardDay} onChange={e => setNewCardDay(e.target.value)}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Dia de vencimento</label>
-                  <input type="number" min="1" max="31" placeholder="Ex: 10"
-                    value={newCardDueDay} onChange={e => setNewCardDueDay(e.target.value)}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-                </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Dia de fechamento</label>
+                <input type="number" min="1" max="31" placeholder="Ex: 15"
+                  value={newCardDay} onChange={e => setNewCardDay(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Limite do cartão (R$)</label>

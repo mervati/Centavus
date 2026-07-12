@@ -79,7 +79,13 @@ export default function Dashboard() {
     const monthTx = rawTx.filter(t => t.date.startsWith(currentYM))
     const monthIncome  = monthTx.filter(t => t.type === 'income').reduce((a, t) => a + Number(t.amount), 0)
     const monthExpense = monthTx.filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0)
-    return balance + savings + ((monthIncome - monthExpense) / dayElapsed) * daysRemaining
+
+    // Fatura do cartão em aberto que vence até o fim deste mês (ainda vai sair do banco)
+    const upcomingFatura = rawTx
+      .filter(t => t.type === 'credit_expense' && !t.bill_paid && t.bill_month && t.bill_month.slice(0, 7) <= currentYM)
+      .reduce((a, t) => a + Number(t.amount), 0)
+
+    return balance + savings + ((monthIncome - monthExpense) / dayElapsed) * daysRemaining - upcomingFatura
   }, [rawTx, settings, balance, savings])
 
   const bankYield = useMemo(() =>
@@ -99,7 +105,7 @@ export default function Dashboard() {
 
     const [{ data: s }, { data: tx }, { data: recent }, { data: bills }] = await Promise.all([
       supabase.from('user_settings').select('*').eq('id', user.id).single(),
-      supabase.from('transactions').select('amount,type,date,description').eq('user_id', user.id),
+      supabase.from('transactions').select('amount,type,date,description,bill_month,bill_paid').eq('user_id', user.id),
       // rico: últimas 5 transações com categorias para exibição
       supabase.from('transactions')
         .select('*, categories(name,icon,color)')

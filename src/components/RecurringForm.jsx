@@ -16,7 +16,7 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
   const [cardId, setCardId] = useState(initial?.card_id ?? '')
   const [paymentMethod, setPaymentMethod] = useState(initial?.card_id ? 'credit' : 'pix')
   const [destination, setDestination] = useState(initial?.payment_method ?? 'transfer')
-  const [dayOfMonth, setDayOfMonth] = useState(initial?.day_of_month ?? Math.min(new Date().getDate(), 28))
+  const [dayOfMonth, setDayOfMonth] = useState(initial?.day_of_month ?? new Date().getDate())
   const [startDate, setStartDate] = useState(
     initial?.start_date ? initial.start_date.slice(0, 7) : new Date().toISOString().slice(0, 7)
   )
@@ -78,12 +78,24 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
       })
   }, [cardId, user.id])
 
+  // Quantos dias tem o mês escolhido em "A partir de"
+  const daysInStartMonth = useMemo(() => {
+    const [y, m] = startDate.split('-').map(Number)
+    if (!y || !m) return 31
+    return new Date(y, m, 0).getDate()
+  }, [startDate])
+
+  // Ao trocar o mês, garante que o dia não passe do máximo daquele mês
+  useEffect(() => {
+    setDayOfMonth(d => Math.min(Number(d) || 1, daysInStartMonth))
+  }, [daysInStartMonth])
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (!description.trim()) return setError('Informe uma descrição.')
     if (!amount || amount <= 0) return setError('Informe um valor válido.')
     if (!categoryId) return setError('Selecione uma categoria.')
-    if (dayOfMonth < 1 || dayOfMonth > 28) return setError('Dia deve ser entre 1 e 28.')
+    if (dayOfMonth < 1 || dayOfMonth > daysInStartMonth) return setError(`Dia deve ser entre 1 e ${daysInStartMonth}.`)
 
     setLoading(true)
     const row = {
@@ -263,12 +275,12 @@ export default function RecurringForm({ initial, onSuccess, onCancel }) {
           <input
             type="number"
             min="1"
-            max="28"
+            max={daysInStartMonth}
             value={dayOfMonth}
             onChange={e => setDayOfMonth(e.target.value)}
             className="w-24 border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500"
           />
-          <span className="text-sm text-gray-500">do mês (máx. 28)</span>
+          <span className="text-sm text-gray-500">do mês (máx. {daysInStartMonth})</span>
         </div>
       </div>
 

@@ -20,8 +20,8 @@ export default function Settings() {
   const [showTelegram, setShowTelegram] = useState(false)
   const [showCards, setShowCards]       = useState(false)
   const [showBackup, setShowBackup]     = useState(false)
-  const [newBank, setNewBank] = useState('')
-  const [newSavings, setNewSavings] = useState('')
+  const [newBank, setNewBank] = useState(0)
+  const [newSavings, setNewSavings] = useState(0)
   const [rebalancing, setRebalancing] = useState(false)
   const [rebalanceSuccess, setRebalanceSuccess] = useState(false)
   const { permission, subscribed, loading: pushLoading, subscribe, unsubscribe } = usePushNotifications()
@@ -101,32 +101,28 @@ export default function Settings() {
 
     const inserts = []
 
-    if (newBank !== '') {
-      const diff = Number(newBank) - balance
-      if (diff !== 0) {
-        inserts.push({
-          user_id: user.id,
-          amount: Math.abs(diff),
-          type: diff > 0 ? 'income' : 'expense',
-          description: 'Re-balanço',
-          date: todayISO(),
-          category_id: category?.id ?? null,
-        })
-      }
+    const diffBank = Number(newBank) - balance
+    if (diffBank !== 0) {
+      inserts.push({
+        user_id: user.id,
+        amount: Math.abs(diffBank),
+        type: diffBank > 0 ? 'income' : 'expense',
+        description: 'Re-balanço',
+        date: todayISO(),
+        category_id: category?.id ?? null,
+      })
     }
 
-    if (newSavings !== '') {
-      const diff = Number(newSavings) - savings
-      if (diff !== 0) {
-        inserts.push({
-          user_id: user.id,
-          amount: Math.abs(diff),
-          type: diff > 0 ? 'savings_deposit' : 'savings_withdrawal',
-          description: 'Re-balanço',
-          date: todayISO(),
-          category_id: category?.id ?? null,
-        })
-      }
+    const diffSav = Number(newSavings) - savings
+    if (diffSav !== 0) {
+      inserts.push({
+        user_id: user.id,
+        amount: Math.abs(diffSav),
+        type: diffSav > 0 ? 'savings_deposit' : 'savings_withdrawal',
+        description: 'Re-balanço',
+        date: todayISO(),
+        category_id: category?.id ?? null,
+      })
     }
 
     if (inserts.length > 0) {
@@ -134,8 +130,6 @@ export default function Settings() {
     }
 
     setRebalancing(false)
-    setNewBank('')
-    setNewSavings('')
     setShowRebalance(false)
     setRebalanceSuccess(true)
     setTimeout(() => setRebalanceSuccess(false), 3000)
@@ -671,7 +665,11 @@ export default function Settings() {
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2 px-1">Avançado</p>
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
             <button
-              onClick={() => setShowRebalance(v => !v)}
+              onClick={() => {
+                const opening = !showRebalance
+                setShowRebalance(opening)
+                if (opening) { setNewBank(balance); setNewSavings(savings) }
+              }}
               className="w-full p-4 flex items-center justify-between"
             >
               <div className="flex items-center gap-3">
@@ -703,37 +701,17 @@ export default function Settings() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Novo Saldo Banco (R$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Deixe em branco para não alterar"
-                    value={newBank}
-                    onChange={e => setNewBank(e.target.value)}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                  />
-                </div>
+                <CurrencyInput label="Novo Saldo Banco (R$)" value={newBank} onChange={setNewBank} />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Novo Cofrinho (R$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Deixe em branco para não alterar"
-                    value={newSavings}
-                    onChange={e => setNewSavings(e.target.value)}
-                    className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                  />
-                </div>
+                <CurrencyInput label="Novo Cofrinho (R$)" value={newSavings} onChange={setNewSavings} />
 
                 <p className="text-xs text-gray-400">
-                  A diferença será registrada como transação "Re-balanço" no histórico.
+                  Os campos já vêm com o saldo atual. Edite para o novo valor — a diferença será registrada como transação "Re-balanço" no histórico.
                 </p>
 
                 <button
                   type="submit"
-                  disabled={rebalancing || (newBank === '' && newSavings === '')}
+                  disabled={rebalancing || (Number(newBank) === balance && Number(newSavings) === savings)}
                   className="w-full py-3 rounded-xl bg-yellow-600 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   <RefreshCw size={16} />

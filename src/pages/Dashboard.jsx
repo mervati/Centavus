@@ -102,8 +102,9 @@ export default function Dashboard() {
     const today = new Date()
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0]
     const firstDayOfNextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1).toISOString().split('T')[0]
+    const currentYM = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
 
-    const [{ data: s }, { data: tx }, { data: recent }, { data: bills }] = await Promise.all([
+    const [{ data: s }, { data: tx }, { data: recent }, { data: bills }, { data: creditTx }] = await Promise.all([
       supabase.from('user_settings').select('*').eq('id', user.id).single(),
       supabase.from('transactions').select('amount,type,date,description,bill_month,bill_paid').eq('user_id', user.id),
       // rico: últimas 5 transações com categorias para exibição
@@ -114,6 +115,13 @@ export default function Dashboard() {
         .order('created_at', { ascending: false })
         .limit(5),
       supabase.from('bills').select('*').eq('user_id', user.id).eq('paid', false).gte('due_date', firstDayOfMonth).lt('due_date', firstDayOfNextMonth).order('due_date'),
+      // faturas de cartão em aberto (para juntar em "Próximas contas")
+      supabase.from('transactions')
+        .select('amount, card_id, bill_month, bill_due_date, credit_cards(name, closing_day)')
+        .eq('user_id', user.id)
+        .eq('type', 'credit_expense')
+        .eq('bill_paid', false)
+        .not('card_id', 'is', null),
     ])
 
     if (!s) {
@@ -122,10 +130,41 @@ export default function Dashboard() {
       return
     }
 
+    // Agrupa faturas por cartão + mês; mantém só as que vencem neste mês
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+    const faturaMap = {}
+    for (const t of (creditTx || [])) {
+      const bm = (t.bill_month ?? '').slice(0, 7)
+      if (bm !== currentYM) continue
+      const key = `${t.card_id}__${bm}`
+      if (!faturaMap[key]) faturaMap[key] = {
+        card_id: t.card_id,
+        name: t.credit_cards?.name,
+        closing_day: t.credit_cards?.closing_day,
+        dueDate: null,
+        total: 0,
+      }
+      faturaMap[key].total += Number(t.amount)
+      if (t.bill_due_date) faturaMap[key].dueDate = t.bill_due_date
+    }
+    const faturaBills = Object.values(faturaMap).map(f => {
+      const day = Math.min(f.closing_day || 1, lastDay)
+      const due = f.dueDate || new Date(today.getFullYear(), today.getMonth(), day).toISOString().split('T')[0]
+      return {
+        id: `fatura-${f.card_id}-${currentYM}`,
+        description: `Fatura ${f.name ?? 'Cartão'}`,
+        amount: f.total,
+        due_date: due,
+        isFatura: true,
+      }
+    })
+
+    const mergedBills = [...(bills || []), ...faturaBills].sort((a, b) => a.due_date.localeCompare(b.due_date))
+
     setSettings(s)
     setRawTx(tx ?? [])
     setRecentTx(recent ?? [])
-    setUpcomingBills(bills || [])
+    setUpcomingBills(mergedBills)
     if (s?.dashboard_layout) {
       try {
         setDashboardLayout(JSON.parse(s.dashboard_layout))

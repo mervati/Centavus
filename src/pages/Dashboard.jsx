@@ -6,7 +6,7 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import TransactionForm from '../components/TransactionForm'
 import { formatCurrency, formatDate, daysUntil, isOverdue, todayISO } from '../utils/format'
-import { Plus, TrendingUp, TrendingDown, PiggyBank, AlertCircle, LogOut, Settings, ChevronRight, Percent, Check, Edit2, Eye, EyeOff, GripVertical } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, PiggyBank, AlertCircle, LogOut, Settings, ChevronRight, Percent, Check, Edit2, Eye, EyeOff, GripVertical, ArrowLeftRight } from 'lucide-react'
 import CurrencyInput from '../components/CurrencyInput'
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions'
 
@@ -46,6 +46,10 @@ export default function Dashboard() {
   const [yieldTarget, setYieldTarget]   = useState('bank')  // 'bank' | 'savings'
   const [yieldMode, setYieldMode]       = useState('diff')  // 'diff'=só rendimento | 'full'=saldo completo
   const [yieldAmt, setYieldAmt]         = useState(0)
+  const [showTransferModal, setShowTransferModal] = useState(false)
+  const [transferDir, setTransferDir]   = useState('to_savings')  // 'to_savings'=banco→cofrinho | 'to_bank'=cofrinho→banco
+  const [transferAmt, setTransferAmt]   = useState(0)
+  const [transferLoading, setTransferLoading] = useState(false)
   const [yieldLoading, setYieldLoading] = useState(false)
   const [editMode, setEditMode]         = useState(false)
   const [dashboardLayout, setDashboardLayout] = useState([
@@ -223,6 +227,26 @@ export default function Dashboard() {
     loadData()
   }
 
+  async function handleTransfer() {
+    const source = transferDir === 'to_savings' ? balance : savings
+    if (transferAmt <= 0 || transferAmt > source) return
+    setTransferLoading(true)
+    await supabase.from('transactions').insert({
+      user_id:        user.id,
+      amount:         transferAmt,
+      type:           transferDir === 'to_savings' ? 'savings_deposit' : 'savings_withdrawal',
+      description:    transferDir === 'to_savings' ? 'Transferência para o Cofrinho' : 'Transferência para o Banco',
+      date:           todayISO(),
+      category_id:    null,
+      payment_method: 'pix',
+      wallet:         null,
+    })
+    setShowTransferModal(false)
+    setTransferAmt(0)
+    setTransferLoading(false)
+    loadData()
+  }
+
   async function toggleCardVisibility(id) {
     const updated = dashboardLayout.map(c => c.id === id ? { ...c, visible: !c.visible } : c)
     setDashboardLayout(updated)
@@ -395,20 +419,29 @@ export default function Dashboard() {
       </div>
 
       {/* Add transaction button */}
-      <div className="px-4 mb-6 flex gap-3">
+      <div className="px-4 mb-6 space-y-3">
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowTxModal(true)}
+            className="flex-1 py-3.5 rounded-2xl bg-yellow-600 text-white font-semibold flex items-center justify-center gap-2 shadow-sm"
+          >
+            <Plus size={20} />
+            Nova transação
+          </button>
+          <button
+            onClick={() => { setShowYieldModal(true); setYieldAmt(0); setYieldTarget('bank'); setYieldMode('diff') }}
+            className="py-3.5 px-4 rounded-2xl border-2 border-yellow-600 text-yellow-700 font-semibold flex items-center justify-center gap-2"
+          >
+            <Percent size={18} />
+            Rendimento
+          </button>
+        </div>
         <button
-          onClick={() => setShowTxModal(true)}
-          className="flex-1 py-3.5 rounded-2xl bg-yellow-600 text-white font-semibold flex items-center justify-center gap-2 shadow-sm"
+          onClick={() => { setShowTransferModal(true); setTransferAmt(0); setTransferDir('to_savings') }}
+          className="w-full py-3 rounded-2xl border-2 border-blue-500 text-blue-600 font-semibold flex items-center justify-center gap-2"
         >
-          <Plus size={20} />
-          Nova transação
-        </button>
-        <button
-          onClick={() => { setShowYieldModal(true); setYieldAmt(0); setYieldTarget('bank'); setYieldMode('diff') }}
-          className="py-3.5 px-4 rounded-2xl border-2 border-yellow-600 text-yellow-700 font-semibold flex items-center justify-center gap-2"
-        >
-          <Percent size={18} />
-          Rendimento
+          <ArrowLeftRight size={18} />
+          Transferir Banco ↔ Cofrinho
         </button>
       </div>
 
@@ -533,6 +566,58 @@ export default function Dashboard() {
               >
                 <Check size={18} />
                 {yieldLoading ? 'Salvando...' : `Confirmar +${formatCurrency(canConfirm ? gain : 0)}`}
+              </button>
+            </div>
+          )
+        })()}
+      </Modal>
+
+      {/* Transfer Modal */}
+      <Modal open={showTransferModal} onClose={() => setShowTransferModal(false)} title="Transferir">
+        {(() => {
+          const source = transferDir === 'to_savings' ? balance : savings
+          const canConfirm = transferAmt > 0 && transferAmt <= source
+          return (
+            <div className="space-y-5">
+              {/* Direção */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Direção</p>
+                <div className="space-y-2">
+                  {[
+                    { key: 'to_savings', label: 'Banco → Cofrinho', from: balance },
+                    { key: 'to_bank',    label: 'Cofrinho → Banco', from: savings },
+                  ].map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => { setTransferDir(opt.key); setTransferAmt(0) }}
+                      className={`w-full py-2.5 rounded-xl text-sm font-semibold border-2 transition-colors ${transferDir === opt.key ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500'}`}
+                    >
+                      {opt.label}
+                      <span className="block text-xs font-normal mt-0.5 opacity-70">Disponível: {formatCurrency(opt.from)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Valor */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Valor</p>
+                <CurrencyInput value={transferAmt} onChange={setTransferAmt} autoFocus />
+                {transferAmt > source && (
+                  <p className="text-xs mt-2 text-rose-500 font-medium">
+                    Valor maior que o disponível ({formatCurrency(source)})
+                  </p>
+                )}
+              </div>
+
+              {/* Confirmar */}
+              <button
+                onClick={handleTransfer}
+                disabled={transferLoading || !canConfirm}
+                className="w-full py-3.5 rounded-2xl bg-blue-600 text-white font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+              >
+                <ArrowLeftRight size={18} />
+                {transferLoading ? 'Transferindo...' : 'Confirmar transferência'}
               </button>
             </div>
           )

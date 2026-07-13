@@ -354,8 +354,11 @@ export default function Summary() {
         title={catModal ? `${catModal.icon} ${catModal.name}` : ''}
       >
         {catModal && (() => {
+          const typeMatch = catModal.type === 'income'
+            ? t => t.type === 'income' || t.type === 'cofrinho_income'
+            : t => t.type === 'expense'
           const txs = rawTx
-            .filter(t => t.date.startsWith(month) && (t.categories?.name ?? 'Sem categoria') === catModal.name)
+            .filter(t => t.date.startsWith(month) && (t.categories?.name ?? 'Sem categoria') === catModal.name && typeMatch(t))
             .sort((a, b) => b.date.localeCompare(a.date))
           const total = txs.reduce((s, t) => s + Number(t.amount), 0)
           return (

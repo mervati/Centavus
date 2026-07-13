@@ -5,7 +5,7 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import TransactionForm from '../components/TransactionForm'
 import { formatCurrency, formatDate, todayISO } from '../utils/format'
-import { Plus, Trash2, Pencil, RefreshCw, Search, X } from 'lucide-react'
+import { Plus, Trash2, Pencil, RefreshCw, Search, X, Lock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 const TYPE_LABELS = {
@@ -158,6 +158,7 @@ export default function Transactions() {
   , [filtered])
 
   async function handleDelete(tx) {
+    if (tx.categories?.name === 'Transferência') return  // transferências não podem ser excluídas
     if (tx.type === 'credit_expense' && tx.installments > 1) {
       const { data } = await supabase
         .from('transactions').select('id')
@@ -297,18 +298,26 @@ export default function Transactions() {
                 {TYPE_SIGNS[tx.type]}{formatCurrency(tx.amount)}
               </p>
               <div className="flex gap-1 ml-1">
-                <button
-                  onClick={() => { setEditing(tx); setShowModal(true) }}
-                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-yellow-600"
-                >
-                  <Pencil size={14} />
-                </button>
-                <button
-                  onClick={() => handleDelete(tx)}
-                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-rose-600"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {tx.categories?.name === 'Transferência' ? (
+                  <div className="w-7 h-7 flex items-center justify-center text-gray-300" title="Transferência não pode ser editada ou excluída">
+                    <Lock size={13} />
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => { setEditing(tx); setShowModal(true) }}
+                      className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-yellow-600"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(tx)}
+                      className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-rose-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
-import { Plus, Trash2, Pencil } from 'lucide-react'
+import { Plus, Trash2, Pencil, Lock } from 'lucide-react'
 
 const ICONS = ['💰','💳','🏠','🚗','🍔','📚','❤️','🎮','👗','✈️','💼','💻','📈','💡','🛒','🎵','⚽','🎬','🍷','☕','🐶','👶','💊','🏋️','📱','🎁','🔧','💧','👵','🐷','💸']
 const COLORS = ['#7c3aed','#3b82f6','#10b981','#f59e0b','#ef4444','#ec4899','#06b6d4','#f97316','#8b5cf6','#22c55e','#6366f1','#14b8a6']
@@ -126,9 +126,10 @@ export default function Categories() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  async function handleDelete(id) {
+  async function handleDelete(cat) {
+    if (cat.is_default) return  // categorias padrão não podem ser removidas
     if (!confirm('Remover esta categoria?')) return
-    await supabase.from('categories').delete().eq('id', id)
+    await supabase.from('categories').delete().eq('id', cat.id)
     loadData()
   }
 
@@ -189,12 +190,18 @@ export default function Categories() {
                 >
                   <Pencil size={14} />
                 </button>
-                <button
-                  onClick={() => handleDelete(cat.id)}
-                  className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-rose-600"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {cat.is_default ? (
+                  <div className="w-7 h-7 flex items-center justify-center text-gray-300" title="Categoria padrão do sistema — não pode ser removida">
+                    <Lock size={13} />
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleDelete(cat)}
+                    className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-rose-600"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
           ))}

@@ -11,22 +11,22 @@ import CurrencyInput from '../components/CurrencyInput'
 import { useRecurringTransactions } from '../hooks/useRecurringTransactions'
 
 const DEFAULT_CATEGORIES = [
-  { name: 'Salário', type: 'income', color: '#22c55e', icon: '💼' },
-  { name: 'Freelance', type: 'income', color: '#10b981', icon: '💻' },
-  { name: 'Investimentos', type: 'income', color: '#06b6d4', icon: '📈' },
-  { name: 'Rendimento', type: 'income', color: '#059669', icon: '💸' },
-  { name: 'Outros (entrada)', type: 'income', color: '#8b5cf6', icon: '➕' },
-  { name: 'Alimentação', type: 'expense', color: '#f97316', icon: '🍔' },
-  { name: 'Transporte', type: 'expense', color: '#3b82f6', icon: '🚗' },
-  { name: 'Moradia', type: 'expense', color: '#6366f1', icon: '🏠' },
-  { name: 'Saúde', type: 'expense', color: '#ef4444', icon: '❤️' },
-  { name: 'Educação', type: 'expense', color: '#f59e0b', icon: '📚' },
-  { name: 'Lazer', type: 'expense', color: '#ec4899', icon: '🎮' },
-  { name: 'Roupas', type: 'expense', color: '#8b5cf6', icon: '👗' },
-  { name: 'Cartão', type: 'expense', color: '#a855f7', icon: '💳' },
-  { name: 'Re-balanço', type: 'expense', color: '#f97316', icon: '💰' },
-  { name: 'Transferência', type: 'expense', color: '#3b82f6', icon: '↔️' },
-  { name: 'Outros (saída)', type: 'expense', color: '#6b7280', icon: '➖' },
+  { name: 'Salário', type: 'income', color: '#22c55e', icon: '💼', is_default: true },
+  { name: 'Freelance', type: 'income', color: '#10b981', icon: '💻', is_default: true },
+  { name: 'Investimentos', type: 'income', color: '#06b6d4', icon: '📈', is_default: true },
+  { name: 'Rendimento', type: 'income', color: '#059669', icon: '💸', is_default: true },
+  { name: 'Outros (entrada)', type: 'income', color: '#8b5cf6', icon: '➕', is_default: true },
+  { name: 'Alimentação', type: 'expense', color: '#f97316', icon: '🍔', is_default: true },
+  { name: 'Transporte', type: 'expense', color: '#3b82f6', icon: '🚗', is_default: true },
+  { name: 'Moradia', type: 'expense', color: '#6366f1', icon: '🏠', is_default: true },
+  { name: 'Saúde', type: 'expense', color: '#ef4444', icon: '❤️', is_default: true },
+  { name: 'Educação', type: 'expense', color: '#f59e0b', icon: '📚', is_default: true },
+  { name: 'Lazer', type: 'expense', color: '#ec4899', icon: '🎮', is_default: true },
+  { name: 'Roupas', type: 'expense', color: '#8b5cf6', icon: '👗', is_default: true },
+  { name: 'Cartão', type: 'expense', color: '#a855f7', icon: '💳', is_default: true },
+  { name: 'Re-balanço', type: 'expense', color: '#f97316', icon: '💰', is_default: true },
+  { name: 'Transferência', type: 'expense', color: '#3b82f6', icon: '↔️', is_default: true },
+  { name: 'Outros (saída)', type: 'expense', color: '#6b7280', icon: '➖', is_default: true },
 ]
 
 export default function Dashboard() {

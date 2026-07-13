@@ -216,7 +216,7 @@ export default function Transactions() {
       }
     >
       {/* Filters */}
-      <div className="px-4 py-3 space-y-3">
+      <div className="px-4 py-2.5 space-y-2">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input
@@ -224,7 +224,7 @@ export default function Transactions() {
             placeholder="Buscar por descrição..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full border border-gray-300 rounded-xl pl-9 pr-9 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            className="w-full border border-gray-300 rounded-xl pl-9 pr-9 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -233,35 +233,33 @@ export default function Transactions() {
           )}
         </div>
 
-        <div className="flex gap-2">
-          <div className="relative flex-1 min-w-0">
-            <input
-              type="month"
-              value={filterMonth}
-              onChange={e => setFilterMonth(e.target.value)}
-              className="w-full border border-gray-300 rounded-xl pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-            />
-            {filterMonth && (
-              <button
-                onClick={() => setFilterMonth('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          <select
-            value={filterCategory}
-            onChange={e => setFilterCategory(e.target.value)}
-            className="flex-1 min-w-0 border border-gray-300 rounded-xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
-          >
-            <option value="">Todas categorias</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
-            ))}
-          </select>
+        <div className="relative">
+          <input
+            type="month"
+            value={filterMonth}
+            onChange={e => setFilterMonth(e.target.value)}
+            className="w-full border border-gray-300 rounded-xl pl-3 pr-8 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+          />
+          {filterMonth && (
+            <button
+              onClick={() => setFilterMonth('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
+
+        <select
+          value={filterCategory}
+          onChange={e => setFilterCategory(e.target.value)}
+          className="w-full border border-gray-300 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
+        >
+          <option value="">Todas as categorias</option>
+          {categories.map(c => (
+            <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+          ))}
+        </select>
 
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
           {[['all','Todas'],['income','Receitas'],['expense','Despesas'],['credit_expense','Crédito'],['savings_deposit','Cofrinho +'],['savings_withdrawal','Cofrinho -']].map(([val, label]) => (

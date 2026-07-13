@@ -64,7 +64,14 @@ export default function Transactions() {
   const [filterType, setFilterType]       = useState('all')
   const [search, setSearch]               = useState('')
   const [filterMonth, setFilterMonth]     = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [categories, setCategories]       = useState([])
   const sentinelRef                       = useRef(null)
+
+  useEffect(() => {
+    supabase.from('categories').select('id,name,icon').eq('user_id', user.id).order('name')
+      .then(({ data }) => setCategories(data ?? []))
+  }, [user.id])
 
   // Carrega os últimos 30 dias
   const loadData = useCallback(async () => {
@@ -143,12 +150,13 @@ export default function Transactions() {
   const filtered = useMemo(() => {
     let list = transactions
     if (filterType !== 'all') list = list.filter(t => t.type === filterType)
+    if (filterCategory) list = list.filter(t => t.category_id === filterCategory)
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter(t => t.description.toLowerCase().includes(q))
     }
     return list
-  }, [transactions, filterType, search])
+  }, [transactions, filterType, filterCategory, search])
 
   const monthTotal = useMemo(() =>
     filtered.reduce((acc, t) => {
@@ -242,6 +250,27 @@ export default function Transactions() {
           )}
           {!filterMonth && (
             <span className="flex-shrink-0 text-xs text-gray-400 whitespace-nowrap">Últimos 30 dias</span>
+          )}
+        </div>
+
+        <div className="relative flex items-center gap-2">
+          <select
+            value={filterCategory}
+            onChange={e => setFilterCategory(e.target.value)}
+            className="flex-1 min-w-0 max-w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
+          >
+            <option value="">Todas as categorias</option>
+            {categories.map(c => (
+              <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
+            ))}
+          </select>
+          {filterCategory && (
+            <button
+              onClick={() => setFilterCategory('')}
+              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-500"
+            >
+              <X size={14} />
+            </button>
           )}
         </div>
 

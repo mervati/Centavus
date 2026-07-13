@@ -118,6 +118,24 @@ export function useRecurringTransactions() {
     }
 
     if (toInsert.length > 0) {
+      // Herda o vencimento já definido para a fatura (card_id + bill_month), se existir,
+      // para novas compras não nascerem sem data numa fatura que já tem vencimento
+      const creditCardIds = [...new Set(toInsert.filter(t => t.type === 'credit_expense').map(t => t.card_id))]
+      if (creditCardIds.length > 0) {
+        const { data: existingDueDates } = await supabase
+          .from('transactions')
+          .select('card_id, bill_month, bill_due_date')
+          .in('card_id', creditCardIds)
+          .not('bill_due_date', 'is', null)
+        const dueDateByKey = {}
+        for (const t of (existingDueDates ?? [])) dueDateByKey[`${t.card_id}__${t.bill_month}`] = t.bill_due_date
+        for (const t of toInsert) {
+          if (t.type === 'credit_expense') {
+            t.bill_due_date = dueDateByKey[`${t.card_id}__${t.bill_month}`] ?? null
+          }
+        }
+      }
+
       await supabase.from('transactions').insert(toInsert)
     }
   }, [user])

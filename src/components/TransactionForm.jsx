@@ -223,6 +223,18 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
       } else {
         // Nova transação: insere todas as parcelas
         const installAmt = Math.round(totalAmt / installments * 100) / 100
+        const billMonths = Array.from({ length: installments }, (_, i) => calcBillMonth(date, card.closing_day, i))
+
+        // Busca vencimento já definido para as faturas destes meses (para não nascer sem data)
+        const { data: existingDueDates } = await supabase
+          .from('transactions')
+          .select('bill_month, bill_due_date')
+          .eq('card_id', selectedCard)
+          .in('bill_month', [...new Set(billMonths)])
+          .not('bill_due_date', 'is', null)
+        const dueDateByMonth = {}
+        for (const t of (existingDueDates ?? [])) dueDateByMonth[t.bill_month] = t.bill_due_date
+
         const rows = Array.from({ length: installments }, (_, i) => ({
           user_id:            user.id,
           type:               'credit_expense',
@@ -235,7 +247,8 @@ export default function TransactionForm({ onSuccess, onCancel, initial }) {
           card_id:            selectedCard,
           installments,
           installment_number: i + 1,
-          bill_month:         calcBillMonth(date, card.closing_day, i),
+          bill_month:         billMonths[i],
+          bill_due_date:      dueDateByMonth[billMonths[i]] ?? null,
           bill_paid:          false,
           is_recurring:       i === 0 ? isRecurring : false,
           recurring_group_id: isRecurring ? recurringGroupId : null,

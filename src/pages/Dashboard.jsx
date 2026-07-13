@@ -25,6 +25,7 @@ const DEFAULT_CATEGORIES = [
   { name: 'Roupas', type: 'expense', color: '#8b5cf6', icon: '👗' },
   { name: 'Cartão', type: 'expense', color: '#a855f7', icon: '💳' },
   { name: 'Re-balanço', type: 'expense', color: '#f97316', icon: '💰' },
+  { name: 'Transferência', type: 'expense', color: '#3b82f6', icon: '↔️' },
   { name: 'Outros (saída)', type: 'expense', color: '#6b7280', icon: '➖' },
 ]
 
@@ -231,13 +232,22 @@ export default function Dashboard() {
     const source = transferDir === 'to_savings' ? balance : savings
     if (transferAmt <= 0 || transferAmt > source) return
     setTransferLoading(true)
+
+    // Busca a categoria "Transferência"
+    const { data: category } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('name', 'Transferência')
+      .maybeSingle()
+
     await supabase.from('transactions').insert({
       user_id:        user.id,
       amount:         transferAmt,
       type:           transferDir === 'to_savings' ? 'savings_deposit' : 'savings_withdrawal',
       description:    transferDir === 'to_savings' ? 'Transferência para o Cofrinho' : 'Transferência para o Banco',
       date:           todayISO(),
-      category_id:    null,
+      category_id:    category?.id ?? null,
       payment_method: 'pix',
       wallet:         null,
     })

@@ -198,12 +198,12 @@ export default function Summary() {
   const derived = useMemo(() => {
     const monthTx  = rawTx.filter(t => t.date.startsWith(month))
     const income   = monthTx.filter(t => t.type === 'income' || t.type === 'cofrinho_income').reduce((a, t) => a + Number(t.amount), 0)
-    const expense  = monthTx.filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0)
+    const expense  = monthTx.filter(t => t.type === 'expense' || t.type === 'cofrinho_expense').reduce((a, t) => a + Number(t.amount), 0)
     const savDep   = monthTx.filter(t => t.type === 'savings_deposit').reduce((a, t) => a + Number(t.amount), 0)
     const savWith  = monthTx.filter(t => t.type === 'savings_withdrawal').reduce((a, t) => a + Number(t.amount), 0)
 
     const catMap = {}
-    monthTx.filter(t => t.type === 'expense').forEach(t => {
+    monthTx.filter(t => t.type === 'expense' || t.type === 'cofrinho_expense').forEach(t => {
       const key = t.categories?.name ?? 'Sem categoria'
       if (!catMap[key]) catMap[key] = { value: 0, icon: t.categories?.icon ?? '📦', color: t.categories?.color ?? '#6b7280' }
       catMap[key].value += Number(t.amount)
@@ -225,8 +225,8 @@ export default function Summary() {
       const d  = new Date(y, m - 1 - i, 1)
       const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       const mTx = rawTx.filter(t => t.date.startsWith(ym))
-      const mReceita = mTx.filter(t => t.type === 'income').reduce((a, t) => a + Number(t.amount), 0)
-      const mDespesa = mTx.filter(t => t.type === 'expense').reduce((a, t) => a + Number(t.amount), 0)
+      const mReceita = mTx.filter(t => t.type === 'income' || t.type === 'cofrinho_income').reduce((a, t) => a + Number(t.amount), 0)
+      const mDespesa = mTx.filter(t => t.type === 'expense' || t.type === 'cofrinho_expense').reduce((a, t) => a + Number(t.amount), 0)
       accumulatedBalance += (mReceita - mDespesa)
       monthly.push({
         name:    d.toLocaleDateString('pt-BR', { month: 'short' }),
@@ -243,7 +243,7 @@ export default function Summary() {
     })()
     const prevYM = `${py}-${pm}`
 
-    const prevMonthTx = rawTx.filter(t => t.date.startsWith(prevYM) && t.type === 'expense')
+    const prevMonthTx = rawTx.filter(t => t.date.startsWith(prevYM) && (t.type === 'expense' || t.type === 'cofrinho_expense'))
     const prevCatMap = {}
     prevMonthTx.forEach(t => {
       const key = t.categories?.name ?? 'Sem categoria'
@@ -251,7 +251,7 @@ export default function Summary() {
     })
 
     const currCatMap = {}
-    monthTx.filter(t => t.type === 'expense').forEach(t => {
+    monthTx.filter(t => t.type === 'expense' || t.type === 'cofrinho_expense').forEach(t => {
       const key = t.categories?.name ?? 'Sem categoria'
       currCatMap[key] = (currCatMap[key] ?? 0) + Number(t.amount)
     })
@@ -356,7 +356,7 @@ export default function Summary() {
         {catModal && (() => {
           const typeMatch = catModal.type === 'income'
             ? t => t.type === 'income' || t.type === 'cofrinho_income'
-            : t => t.type === 'expense'
+            : t => t.type === 'expense' || t.type === 'cofrinho_expense'
           const txs = rawTx
             .filter(t => t.date.startsWith(month) && (t.categories?.name ?? 'Sem categoria') === catModal.name && typeMatch(t))
             .sort((a, b) => b.date.localeCompare(a.date))

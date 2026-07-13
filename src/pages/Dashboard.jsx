@@ -245,7 +245,7 @@ export default function Dashboard() {
       user_id:        user.id,
       amount:         transferAmt,
       type:           transferDir === 'to_savings' ? 'savings_deposit' : 'savings_withdrawal',
-      description:    transferDir === 'to_savings' ? 'Transferência para o Cofrinho' : 'Transferência para o Banco',
+      description:    transferDir === 'to_savings' ? 'B → C' : 'C → B',
       date:           todayISO(),
       category_id:    category?.id ?? null,
       payment_method: 'pix',

@@ -233,45 +233,34 @@ export default function Transactions() {
           )}
         </div>
 
-        <div className="relative flex items-center gap-2">
-          <input
-            type="month"
-            value={filterMonth}
-            onChange={e => setFilterMonth(e.target.value)}
-            className="flex-1 min-w-0 max-w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-          />
-          {filterMonth && (
-            <button
-              onClick={() => setFilterMonth('')}
-              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-500"
-            >
-              <X size={14} />
-            </button>
-          )}
-          {!filterMonth && (
-            <span className="flex-shrink-0 text-xs text-gray-400 whitespace-nowrap">Últimos 30 dias</span>
-          )}
-        </div>
+        <div className="flex gap-2">
+          <div className="relative flex-1 min-w-0">
+            <input
+              type="month"
+              value={filterMonth}
+              onChange={e => setFilterMonth(e.target.value)}
+              className="w-full border border-gray-300 rounded-xl pl-3 pr-8 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            />
+            {filterMonth && (
+              <button
+                onClick={() => setFilterMonth('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
 
-        <div className="relative flex items-center gap-2">
           <select
             value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
-            className="flex-1 min-w-0 max-w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
+            className="flex-1 min-w-0 border border-gray-300 rounded-xl px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 bg-white"
           >
-            <option value="">Todas as categorias</option>
+            <option value="">Todas categorias</option>
             {categories.map(c => (
               <option key={c.id} value={c.id}>{c.icon} {c.name}</option>
             ))}
           </select>
-          {filterCategory && (
-            <button
-              onClick={() => setFilterCategory('')}
-              className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-500"
-            >
-              <X size={14} />
-            </button>
-          )}
         </div>
 
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">

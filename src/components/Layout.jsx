@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import BottomNav from './BottomNav'
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 import { WifiOff } from 'lucide-react'
@@ -5,8 +6,27 @@ import { WifiOff } from 'lucide-react'
 export default function Layout({ children, title, action }) {
   const { isOnline, pendingCount } = useOnlineStatus()
 
+  // Trava a altura do "shell" na altura visual real da tela (visualViewport),
+  // para o app não rolar no document/body — só a área <main> rola.
+  // Isso evita o BottomNav "flutuar" quando a barra do navegador esconde/aparece.
+  useEffect(() => {
+    function setAppHeight() {
+      const h = window.visualViewport?.height ?? window.innerHeight
+      document.documentElement.style.setProperty('--app-height', `${h}px`)
+    }
+    setAppHeight()
+    // NUNCA no resize/scroll do visualViewport: no iOS ele dispara o tempo
+    // todo durante o scroll (a barra do navegador some/aparece) e travaria a tela.
+    const onOrientation = () => setTimeout(setAppHeight, 200)
+    window.addEventListener('orientationchange', onOrientation)
+    return () => window.removeEventListener('orientationchange', onOrientation)
+  }, [])
+
   return (
-    <div className="min-h-screen bg-gray-50 max-w-lg mx-auto w-full">
+    <div
+      className="bg-gray-50 max-w-lg mx-auto w-full flex flex-col overflow-hidden"
+      style={{ height: 'var(--app-height, 100dvh)' }}
+    >
       {!isOnline && (
         <div className="sticky top-0 z-40 bg-amber-500 text-white text-xs font-medium flex items-center justify-center gap-2 py-2 px-4">
           <WifiOff size={13} />
@@ -32,7 +52,7 @@ export default function Layout({ children, title, action }) {
           {action}
         </header>
       )}
-      <main className="pb-nav">{children}</main>
+      <main className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{children}</main>
       <BottomNav />
     </div>
   )
